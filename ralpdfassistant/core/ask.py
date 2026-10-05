@@ -1,4 +1,5 @@
 import logging
+import re
 
 from sqlalchemy.orm import Session
 
@@ -12,6 +13,52 @@ from ralpdfassistant.settings import settings
 log = logging.getLogger(__name__)
 
 NO_DOCS = "Пока нет готовых документов, загрузи хотя бы один."
+
+#слова которые есть в любом вопросе и ничего не ищут
+STOP_WORDS = {
+    "какой", "какая", "какие", "какое", "каков", "кто", "что", "сколько", "когда", "где", "как",
+    "для", "при", "про", "это", "был", "была", "были", "есть", "или", "его", "ещё", "еще",
+}  # fmt: skip
+
+#стандартное значение для RRF, подбирать его под данные обычно не нужно
+RRF_K = 60
+
+
+def keywords(question: str) -> str:
+    words = [w for w in re.findall(r"[а-яёa-z0-9]+", question.lower()) if len(w) > 2 and w not in STOP_WORDS]
+    #любое слово из вопроса, а не все сразу. иначе одно лишнее слово обнулит выдачу
+    return " | ".join(dict.fromkeys(words))
+
+
+def fuse(by_vector: list[Hit], by_words: list[Hit], limit: int) -> list[Hit]:
+    # reciprocal rank fusion: складываем 1/(k+место) из обоих списков, шкалы score сравнивать не надо
+    points: dict[int, float] = {}
+    hits: dict[int, Hit] = {}
+    for found in (by_vector, by_words):
+        for rank, hit in enumerate(found):
+            points[hit.id] = points.get(hit.id, 0.0) + 1 / (RRF_K + rank + 1)
+            hits[hit.id] = hit
+    best = sorted(points, key=lambda i: points[i], reverse=True)[:limit]
+    return [hits[i] for i in best]
+
+
+def retrieve(
+    session: Session,
+    embedder: Embedder,
+    question: str,
+    doc_ids: list[int] | None,
+    limit: int | None = None,
+    hybrid: bool | None = None,
+) -> list[Hit]:
+    limit = limit or settings.top_k
+    vec = embedder.embed_query(question)
+    if not (settings.hybrid if hybrid is None else hybrid):
+        return chunks_repo.search(session, vec, doc_ids, limit)
+
+    by_vector = chunks_repo.search(session, vec, doc_ids, settings.candidates)
+    tsquery = keywords(question)
+    by_words = chunks_repo.keyword_search(session, vec, tsquery, doc_ids, settings.candidates) if tsquery else []
+    return fuse(by_vector, by_words, limit)
 
 
 def build_context(hits: list[Hit]) -> str:
@@ -29,7 +76,7 @@ def answer(
     if not question:
         raise AppError("Задай вопрос")
 
-    hits = chunks_repo.search(session, embedder.embed_query(question), doc_ids, settings.top_k)
+    hits = retrieve(session, embedder, question, doc_ids)
     if not hits:
         return NO_DOCS, []
 

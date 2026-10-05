@@ -5,3 +5,5 @@ ruff==0.8.4
 mypy==1.13.0
 testcontainers[postgres]==4.9.0
 reportlab==4.2.5
+#нужен только тестам, чтобы сделать пустой pdf
+pypdf==5.0.1

@@ -41,6 +41,9 @@ class Settings(BaseSettings):
     chunk_size: int = 800
     chunk_overlap: int = 150
     top_k: int = 6
+    #гибридный поиск: векторы плюс слова. кандидатов берём с запасом, потом склеиваем и режем до top_k
+    hybrid: bool = True
+    candidates: int = 30
 
     # swagger в проде лучше выключать
     docs: bool = True

@@ -29,5 +29,9 @@ def test_upgrade_and_downgrade(engine, session):
     assert "ix_chunks_document_id" in indexes
     assert "chunks_embedding_idx" in indexes
 
+    #индекс по выражению sqlalchemy не отражает, смотрим в каталог postgres
+    fts = engine.connect().execute(text("select 1 from pg_indexes where indexname = 'chunks_fts_idx'")).scalar()
+    assert fts == 1
+
     command.downgrade(alembic_config(), "base")
     assert "chunks" not in inspect(engine).get_table_names()

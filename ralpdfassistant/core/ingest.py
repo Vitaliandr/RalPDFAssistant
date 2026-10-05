@@ -1,7 +1,7 @@
 import logging
 from pathlib import Path
 
-from pypdf import PdfReader
+import pdfplumber
 from sqlalchemy.orm import Session
 
 from ralpdfassistant.clients.embeddings import Embedder
@@ -17,8 +17,10 @@ BATCH = 32
 
 def read_pages(path: Path) -> list[tuple[int | None, str]]:
     if path.suffix.lower() == ".pdf":
-        reader = PdfReader(str(path))
-        return [(i + 1, page.extract_text() or "") for i, page in enumerate(reader.pages)]
+        #pdfplumber собирает слова в строки по координатам, поэтому строки таблиц тарифов остаются целыми.
+        # pypdf отдавал сначала все названия строк, потом все значения, и модель путала что к чему
+        with pdfplumber.open(path) as pdf:
+            return [(i + 1, page.extract_text() or "") for i, page in enumerate(pdf.pages)]
 
     raw = path.read_bytes()
     try:

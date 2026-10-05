@@ -3,6 +3,7 @@ from typing import Any
 
 from pgvector.sqlalchemy import Vector
 from sqlalchemy import DateTime, ForeignKey, Index, String, Text, func
+from sqlalchemy import text as sql_text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from ralpdfassistant.database import Base
@@ -39,6 +40,8 @@ class Chunk(Base):
     document: Mapped[Document] = relationship(back_populates="chunks")
 
     __table_args__ = (
+        #поиск по словам, русская морфология: "обслуживании" найдёт "обслуживание"
+        Index("chunks_fts_idx", sql_text("to_tsvector('russian', text)"), postgresql_using="gin"),
         Index(
             "chunks_embedding_idx",
             "embedding",
