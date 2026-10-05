@@ -1,0 +1,59 @@
+[project]
+name = "ralpdfassistant"
+version = "0.1.0"
+requires-python = ">=3.12"
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+extend-exclude = [".venv"]
+
+[tool.ruff.lint]
+# E/W стиль, F ошибки, I порядок импортов, B типичные баги, UP устаревший синтаксис
+select = ["E", "W", "F", "I", "B", "UP"]
+# комментарии пишем как пишем, пробел после # не обязателен
+ignore = ["E262", "E265", "E266"]
+
+[tool.ruff.lint.per-file-ignores]
+#в conftest приложение импортируется после настройки окружения, иначе settings прочитаются раньше
+"tests/conftest.py" = ["E402"]
+#alembic ждёт именно такие переменные в файле миграции
+"migrations/versions/*.py" = ["E501"]
+
+[tool.ruff.lint.flake8-bugbear]
+#Depends() и File() в аргументах по умолчанию это нормальный приём FastAPI, а не баг
+extend-immutable-calls = ["fastapi.Depends", "fastapi.File", "fastapi.Query"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["ralpdfassistant", "tests", "eval"]
+
+[tool.mypy]
+python_version = "3.12"
+plugins = ["pydantic.mypy"]
+packages = ["ralpdfassistant", "tests"]
+#в приложении у каждой функции должны быть типы
+disallow_untyped_defs = true
+check_untyped_defs = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+no_implicit_optional = true
+
+[[tool.mypy.overrides]]
+# в тестах аннотации к каждой функции не пишут, но тело всё равно проверяется
+module = "tests.*"
+disallow_untyped_defs = false
+
+[[tool.mypy.overrides]]
+#у этих библиотек нет аннотаций типов
+module = ["celery", "celery.*", "fastembed", "fastembed.*", "pgvector", "pgvector.*", "testcontainers.*", "reportlab.*"]
+ignore_missing_imports = true
+
+[tool.coverage.run]
+source = ["ralpdfassistant"]
+branch = true
+#настоящая модель весит 2 ГБ, в тестах вместо неё подставляется заглушка
+omit = ["ralpdfassistant/clients/embeddings.py"]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true

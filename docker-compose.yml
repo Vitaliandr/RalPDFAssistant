@@ -1,3 +1,9 @@
+name: ralpdfassistant
+
+x-app-env: &app-env
+  DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-rag}:${POSTGRES_PASSWORD:-rag_pass}@db:5432/${POSTGRES_DB:-rag}
+  REDIS_URL: redis://redis:6379/0
+
 services:
   db:
     image: pgvector/pgvector:pg16
@@ -9,9 +15,8 @@ services:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-rag}"]
-      interval: 5s
-      timeout: 3s
-      retries: 10
+      interval: 3s
+      retries: 20
 
   redis:
     image: redis:7-alpine
@@ -19,14 +24,14 @@ services:
   api:
     build: .
     env_file: .env
-    environment:
-      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-rag}:${POSTGRES_PASSWORD:-rag_pass}@db:5432/${POSTGRES_DB:-rag}
-      REDIS_URL: redis://redis:6379/0
+    environment: *app-env
+    #сначала миграции, потом сервер. 127.0.0.1 чтобы api не торчал в локальную сеть
+    command: sh -c "alembic upgrade head && uvicorn ralpdfassistant.main:app --host 0.0.0.0 --port 8000"
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
     volumes:
-      - uploads:/srv/data/uploads
-      - models:/srv/data/models
+      - uploads:/code/data/uploads
+      - models:/code/data/models
     extra_hosts:
       - "host.docker.internal:host-gateway"
     depends_on:
@@ -37,19 +42,15 @@ services:
 
   worker:
     build: .
-    command: celery -A app.celery_app.celery worker --loglevel=info --concurrency=1
     env_file: .env
-    environment:
-      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-rag}:${POSTGRES_PASSWORD:-rag_pass}@db:5432/${POSTGRES_DB:-rag}
-      REDIS_URL: redis://redis:6379/0
+    environment: *app-env
+    #один процесс, e5 держит в памяти больше 2 ГБ
+    command: celery -A ralpdfassistant.background.celery_app.celery worker --loglevel=info --concurrency=1
     volumes:
-      - uploads:/srv/data/uploads
-      - models:/srv/data/models
+      - uploads:/code/data/uploads
+      - models:/code/data/models
     depends_on:
-      db:
-        condition: service_healthy
-      redis:
-        condition: service_started
+      - api
 
 volumes:
   pgdata:

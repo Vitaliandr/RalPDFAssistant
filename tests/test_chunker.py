@@ -1,4 +1,4 @@
-from app.chunker import split_text
+from ralpdfassistant.core.chunker import split_text
 
 
 def test_empty_text():

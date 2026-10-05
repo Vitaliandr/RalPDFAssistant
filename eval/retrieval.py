@@ -6,9 +6,10 @@ from pathlib import Path
 import numpy as np
 from fastembed import TextEmbedding
 
-from app.chunker import split_text
-from app.config import EMBED_MODELS, settings
-from app.tasks import read_pages
+from ralpdfassistant.core.chunker import split_text
+from ralpdfassistant.core.ingest import read_pages
+from ralpdfassistant.settings import EMBED_MODELS, settings
+
 
 def load_chunks(pdf):
     chunks = []
