@@ -37,7 +37,7 @@ services:
 
   worker:
     build: .
-    command: celery -A app.celery_app.celery worker --loglevel=info --concurrency=2
+    command: celery -A app.celery_app.celery worker --loglevel=info --concurrency=1
     env_file: .env
     environment:
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-rag}:${POSTGRES_PASSWORD:-rag_pass}@db:5432/${POSTGRES_DB:-rag}

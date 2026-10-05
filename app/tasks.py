@@ -6,7 +6,7 @@ from app.celery_app import celery
 from app.chunker import split_text
 from app.config import settings
 from app.db import SessionLocal
-from app.embeddings import embed_texts
+from app.embeddings import embed_passages
 from app.models import Chunk, Document
 
 
@@ -48,7 +48,7 @@ def process_document(doc_id: int):
         #пачками чтоб не упереться в память на больших pdf
         for i in range(0, len(pieces), 32):
             batch = [t for _, t in pieces[i:i + 32]]
-            vectors.extend(embed_texts(batch))
+            vectors.extend(embed_passages(batch))
 
         for pos, ((page, text), vec) in enumerate(zip(pieces, vectors)):
             db.add(Chunk(document_id=doc.id, position=pos, page=page, text=text, embedding=vec))

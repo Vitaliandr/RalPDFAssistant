@@ -8,6 +8,24 @@ def make(**kw):
     return Settings(_env_file=None, **kw)
 
 
+def test_e5_dim_and_prefixes():
+    s = make()
+    assert s.embed_dim == 1024
+    assert s.query_prefix == "query: "
+    assert s.passage_prefix == "passage: "
+
+
+def test_minilm_has_no_prefixes():
+    s = make(embed_model="sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2")
+    assert s.embed_dim == 384
+    assert s.query_prefix == ""
+
+
+def test_unknown_embed_model():
+    with pytest.raises(ValueError):
+        make(embed_model="что-то/левое")
+
+
 def test_ollama_defaults():
     s = make(llm_provider="ollama")
     assert "11434" in s.llm_base_url

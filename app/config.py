@@ -9,6 +9,14 @@ PROVIDERS = {
 }
 
 
+# модель -> (размерность вектора, префикс вопроса, префикс куска)
+# e5 обучали с префиксами, без них она заметно хуже
+EMBED_MODELS = {
+    "intfloat/multilingual-e5-large": (1024, "query: ", "passage: "),
+    "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2": (384, "", ""),
+}
+
+
 class Settings(BaseSettings):
     database_url: str = "postgresql+psycopg://rag:rag_pass@localhost:5432/rag"
     redis_url: str = "redis://localhost:6379/0"
@@ -19,8 +27,11 @@ class Settings(BaseSettings):
     llm_model: str = ""
     llm_api_key: str = ""
 
-    embed_model: str = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
-    embed_dim: int = 384
+    embed_model: str = "intfloat/multilingual-e5-large"
+    # эти три считаются из embed_model в валидаторе ниже
+    embed_dim: int = 0
+    query_prefix: str = ""
+    passage_prefix: str = ""
     models_dir: str = "data/models"
 
     uploads_dir: str = "data/uploads"
@@ -28,7 +39,14 @@ class Settings(BaseSettings):
 
     chunk_size: int = 800
     chunk_overlap: int = 150
-    top_k: int = 5
+    top_k: int = 6
+
+    @model_validator(mode="after")
+    def fill_embed(self):
+        if self.embed_model not in EMBED_MODELS:
+            raise ValueError("неизвестная EMBED_MODEL, доступны: " + ", ".join(EMBED_MODELS))
+        self.embed_dim, self.query_prefix, self.passage_prefix = EMBED_MODELS[self.embed_model]
+        return self
 
     @model_validator(mode="after")
     def fill_llm(self):
