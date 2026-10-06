@@ -23,12 +23,12 @@ services:
 
   api:
     build: .
-    #required: false чтобы запуск не падал у того кто забыл создать .env, все ключи в нём необязательные
+    # без .env тоже стартуем
     env_file:
       - path: .env
         required: false
     environment: *app-env
-    #сначала миграции, потом сервер. 127.0.0.1 чтобы api не торчал в локальную сеть
+    # сначала миграции, 127.0.0.1 чтоб не торчало в сеть
     command: sh -c "alembic upgrade head && uvicorn ralpdfassistant.main:app --host 0.0.0.0 --port 8000"
     ports:
       - "127.0.0.1:8000:8000"
@@ -45,7 +45,7 @@ services:
 
   worker:
     build: .
-    #required: false чтобы запуск не падал у того кто забыл создать .env, все ключи в нём необязательные
+    # без .env тоже стартуем
     env_file:
       - path: .env
         required: false
