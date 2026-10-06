@@ -20,12 +20,12 @@ def test_two_models_local_is_default(client):
     assert "файлы целиком не уходят" in models["groq"]["note"]
 
 
-def test_models_list_has_no_server_key_fields(client):
+def test_models_no_key_fields(client):
     for model in client.get("/api/models").json():
         assert set(model) == {"id", "label", "note", "default", "cloud"}
 
 
-def test_chosen_model_reaches_llm_and_is_reported(client, process, llm):
+def test_chosen_model_used(client, process, llm):
     add_text(client, "Тарифы", "обслуживание карты стоит 99 рублей")
     process()
 
@@ -35,7 +35,7 @@ def test_chosen_model_reaches_llm_and_is_reported(client, process, llm):
     assert llm.models == ["ollama"]
 
 
-def test_local_model_reported_when_not_chosen(client, process, llm):
+def test_local_by_default(client, process, llm):
     add_text(client, "Тарифы", "обслуживание карты стоит 99 рублей")
     process()
 
@@ -78,7 +78,7 @@ def test_key_never_appears_in_logs(client, process, llm, caplog):
     assert "gsk_secret" not in r.text
 
 
-def test_cloud_model_without_key_gives_readable_error(client, process):
+def test_cloud_without_key_error(client, process):
     #нужен настоящий ask_llm
     app.dependency_overrides[llm_dep] = lambda: ask_llm
     add_text(client, "Тарифы", "обслуживание карты стоит 99 рублей")
@@ -89,7 +89,7 @@ def test_cloud_model_without_key_gives_readable_error(client, process):
     assert "нужен ключ" in r.json()["detail"]
 
 
-def test_unknown_model_gives_readable_error(client, process):
+def test_unknown_model_error(client, process):
     app.dependency_overrides[llm_dep] = lambda: ask_llm
     add_text(client, "Тарифы", "обслуживание карты стоит 99 рублей")
     process()

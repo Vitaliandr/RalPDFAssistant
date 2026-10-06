@@ -67,7 +67,7 @@ def test_own_origin_is_fine(client):
     assert r.status_code == 200
 
 
-def test_foreign_origin_can_still_read_health(client):
+def test_foreign_origin_get_ok(client):
     # get данные не меняет, пропускаем
     assert client.get("/health", headers={"Origin": "http://evil.example"}).status_code == 200
 

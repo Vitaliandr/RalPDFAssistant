@@ -28,7 +28,7 @@ def test_best_source_is_first(client, process):
     assert sources[0]["score"] > sources[-1]["score"]
 
 
-def test_context_for_llm_has_numbers_and_titles(client, process, llm):
+def test_context_has_titles(client, process, llm):
     fill(client, process)
     ask(client, "под какой процент вклад?")
 
@@ -64,7 +64,7 @@ def test_no_documents(client, llm):
     assert llm.calls == []
 
 
-def test_unready_documents_are_not_searched(client, llm):
+def test_unready_not_searched(client, llm):
     add_text(client, "ещё в очереди", "обслуживание карты стоит 99 рублей")
     r = ask(client, "обслуживание карты")
     assert r.json()["sources"] == []

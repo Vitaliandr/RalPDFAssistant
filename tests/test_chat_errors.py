@@ -12,7 +12,7 @@ def test_llm_error_is_502_with_text(client, process, llm):
     assert "лимит" in r.json()["detail"]
 
 
-def test_unexpected_error_is_500_without_details(client, process, llm):
+def test_500_hides_details(client, process, llm):
     add_text(client, "Тарифы", "обслуживание карты стоит 99 рублей")
     process()
     llm.error = RuntimeError("секретная деталь устройства сервера")

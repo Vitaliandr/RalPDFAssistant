@@ -26,7 +26,7 @@ def test_fuse_prefers_item_found_by_both():
     assert fused[0].id == 2
 
 
-def test_fuse_respects_limit_and_has_no_duplicates():
+def test_fuse_limit_no_dupes():
     fused = ask.fuse([hit(1), hit(2), hit(3)], [hit(3), hit(4), hit(1)], limit=3)
     assert len(fused) == 3
     assert len({h.id for h in fused}) == 3
@@ -56,7 +56,7 @@ def test_hybrid_off_is_plain_vector_search(client, process, session):
     assert found[0].title == "Тарифы"
 
 
-def test_word_search_respects_document_filter(client, process, session):
+def test_words_respect_filter(client, process, session):
     first = add_text(client, "Первый", "Штраф за просрочку платежа пятьсот рублей")
     second = add_text(client, "Второй", "Штраф за просрочку займа тысяча рублей")
     process()
@@ -66,7 +66,7 @@ def test_word_search_respects_document_filter(client, process, session):
     assert first not in [h.id for h in found]
 
 
-def test_only_stop_words_falls_back_to_vectors(client, process, session):
+def test_only_stop_words(client, process, session):
     add_text(client, "Тарифы", "Обслуживание карты стоит 99 рублей")
     process()
 

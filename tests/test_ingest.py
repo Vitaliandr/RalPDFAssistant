@@ -52,7 +52,7 @@ def test_context_head_takes_first_words():
     assert "слово18" not in line
 
 
-def test_embedder_gets_context_but_base_keeps_clean_chunk(session, tmp_path, monkeypatch):
+def test_context_only_in_vector(session, tmp_path, monkeypatch):
     monkeypatch.setattr(settings, "chunk_context", "title")
     f = tmp_path / "a.txt"
     f.write_text("Ставка по вкладу 14 процентов", encoding="utf-8")

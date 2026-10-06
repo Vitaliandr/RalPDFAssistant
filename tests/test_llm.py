@@ -74,7 +74,7 @@ def test_groq_goes_to_groq_with_users_key():
     assert seen["model"] == settings.groq_model
 
 
-def test_users_key_is_not_sent_to_local_model():
+def test_key_not_sent_to_local():
     seen = {}
 
     def handler(request: httpx.Request) -> httpx.Response:
@@ -85,7 +85,7 @@ def test_users_key_is_not_sent_to_local_model():
     assert seen["auth"] is None
 
 
-def test_cloud_model_without_key_is_refused():
+def test_cloud_needs_key():
     with pytest.raises(AppError) as e:
         ask_llm("q", "c", "groq", client=client_with(lambda r: httpx.Response(200, json=OK)))
     assert "нужен ключ" in e.value.message
@@ -130,7 +130,7 @@ def test_provider_errors_become_readable(code, part):
     assert part in e.value.message
 
 
-def test_local_model_unreachable_tells_what_to_do():
+def test_local_unreachable_hint():
     def handler(request: httpx.Request) -> httpx.Response:
         raise httpx.ConnectError("нет связи")
 
@@ -142,7 +142,7 @@ def test_local_model_unreachable_tells_what_to_do():
     assert "Groq" in e.value.message
 
 
-def test_cloud_unreachable_mentions_internet():
+def test_cloud_unreachable():
     def handler(request: httpx.Request) -> httpx.Response:
         raise httpx.ConnectError("нет связи")
 
