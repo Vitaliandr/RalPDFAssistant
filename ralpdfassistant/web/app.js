@@ -13,7 +13,6 @@ const fileEl = document.getElementById('file');
 
 const modelEl = document.getElementById('model');
 const modelNoteEl = document.getElementById('modelNote');
-const scopeEl = document.getElementById('scope');
 
 let models = {};
 
@@ -141,68 +140,163 @@ modelEl.onchange = () => {
   try { localStorage.setItem('model', modelEl.value); } catch (e) { /* ничего страшного */ }
   showModelNote();
 };
-const pickHintEl = document.getElementById('pickHint');
 
-//пусто = ищем по всем
-const selected = new Set();
+const pickHintEl = document.getElementById('pickHint');
+const chatTitleEl = document.getElementById('chatTitle');
+const chatSubEl = document.getElementById('chatSub');
+const clearBtn = document.getElementById('clearChat');
+
 let lastDocs = [];
 let timer = null;
+
+//чаты лежат в браузере: all общий, остальные по id документа
+let chats = {};
+let current = 'all';
+const MAX_MSGS = 60;
+
+try {
+  chats = JSON.parse(localStorage.getItem('chats') || '{}');
+  current = localStorage.getItem('chatCurrent') || 'all';
+} catch (e) { chats = {}; }
+
+function saveChats() {
+  try {
+    localStorage.setItem('chats', JSON.stringify(chats));
+    localStorage.setItem('chatCurrent', current);
+  } catch (e) {
+    //не влезло, без источников они самые тяжёлые
+    try {
+      const light = {};
+      for (const k in chats) light[k] = chats[k].map(m => ({ ...m, sources: undefined }));
+      localStorage.setItem('chats', JSON.stringify(light));
+    } catch (e2) { /* ну и ладно, история доживёт до перезагрузки */ }
+  }
+}
+
+function pushMsg(key, msg) {
+  if (!chats[key]) chats[key] = [];
+  chats[key].push(msg);
+  if (chats[key].length > MAX_MSGS) chats[key].splice(0, chats[key].length - MAX_MSGS);
+  saveChats();
+}
 
 function readyDocs() {
   return lastDocs.filter(d => d.status === 'ready');
 }
 
-function pickedIds() {
-  return readyDocs().filter(d => selected.has(d.id)).map(d => d.id);
+function curDoc() {
+  return lastDocs.find(d => String(d.id) === current);
 }
 
-function updateScope() {
-  const ready = readyDocs();
-  const picked = ready.filter(d => selected.has(d.id));
-  scopeEl.innerHTML = '';
-
-  const text = document.createElement('span');
-  if (!ready.length) {
-    text.textContent = 'Нет готовых документов';
-  } else if (!picked.length) {
-    text.textContent = 'Ищу по всем документам (' + ready.length + ')';
+function renderHead() {
+  if (current === 'all') {
+    chatTitleEl.textContent = 'Все документы' + (readyDocs().length ? ' (' + readyDocs().length + ')' : '');
+    chatSubEl.textContent = 'ищу по всем сразу';
   } else {
-    text.textContent = 'Ищу только в: ' + picked.map(d => d.title).join(', ');
+    const d = curDoc();
+    chatTitleEl.textContent = d ? d.title : 'Документ';
+    chatSubEl.textContent = 'ищу только в нём';
   }
-  scopeEl.append(text);
+  clearBtn.disabled = !(chats[current] && chats[current].length);
+}
 
-  if (picked.length) {
-    const reset = document.createElement('button');
-    reset.type = 'button';
-    reset.className = 'link';
-    reset.textContent = 'искать по всем';
-    reset.onclick = () => { selected.clear(); renderDocs(); };
-    scopeEl.append(reset);
+function addMsg(text, cls) {
+  const div = document.createElement('div');
+  div.className = 'msg ' + cls;
+  div.textContent = text;
+  messages.append(div);
+  messages.scrollTop = messages.scrollHeight;
+  return div;
+}
+
+function addBy(msgEl, modelId) {
+  const by = document.createElement('div');
+  by.className = 'by';
+  by.textContent = models[modelId] ? models[modelId].label : modelId;
+  msgEl.append(by);
+}
+
+function addSources(msgEl, sources) {
+  if (!sources || !sources.length) return;
+  const det = document.createElement('details');
+  det.className = 'sources';
+  const sum = document.createElement('summary');
+  sum.textContent = 'Источники (' + sources.length + ')';
+  det.append(sum);
+
+  for (const s of sources) {
+    const box = document.createElement('div');
+    box.className = 'src';
+    const head = document.createElement('b');
+    head.textContent = s.document + (s.page ? ', стр. ' + s.page : '') + ' · ' + s.score;
+    const body = document.createElement('div');
+    body.textContent = s.text;
+    box.append(head, body);
+    det.append(box);
+  }
+  msgEl.append(det);
+}
+
+function drawMsg(m) {
+  const div = addMsg(m.text, m.role === 'user' ? 'user' : 'bot');
+  if (m.role === 'bot') {
+    addSources(div, m.sources);
+    if (m.model) addBy(div, m.model);
   }
 }
+
+function renderChat() {
+  messages.innerHTML = '';
+  const list = chats[current] || [];
+  if (!list.length) {
+    addMsg(current === 'all'
+      ? 'Привет! Загрузи документ слева, а потом спрашивай, например про тарифы или условия.'
+      : 'Тут отдельный чат по этому документу, спрашивай.', 'bot');
+  }
+  for (const m of list) drawMsg(m);
+  messages.scrollTop = messages.scrollHeight;
+  renderHead();
+}
+
+function selectChat(key) {
+  current = key;
+  saveChats();
+  renderDocs();
+  renderChat();
+  document.getElementById('question').focus();
+}
+
+clearBtn.onclick = () => {
+  if (!confirm('Очистить этот чат?')) return;
+  chats[current] = [];
+  saveChats();
+  renderChat();
+};
 
 function renderDocs() {
   hintEl.style.display = lastDocs.length ? 'none' : 'block';
-  pickHintEl.hidden = readyDocs().length < 2;
+  pickHintEl.hidden = readyDocs().length < 1;
   docsEl.innerHTML = '';
+
+  const all = document.createElement('li');
+  all.className = 'all' + (current === 'all' ? ' picked' : '');
+  const allName = document.createElement('span');
+  allName.className = 'name';
+  allName.textContent = 'Все документы';
+  const allCount = document.createElement('span');
+  allCount.className = 'badge ready';
+  allCount.textContent = readyDocs().length;
+  all.append(allName, allCount);
+  all.onclick = () => selectChat('all');
+  docsEl.append(all);
 
   for (const d of lastDocs) {
     const li = document.createElement('li');
-    if (selected.has(d.id) && d.status === 'ready') li.className = 'picked';
+    const ready = d.status === 'ready';
+    li.className = (current === String(d.id) ? 'picked' : '') + (ready ? '' : ' off');
 
-    const cb = document.createElement('input');
-    cb.type = 'checkbox';
-    cb.id = 'doc' + d.id;
-    cb.disabled = d.status !== 'ready';
-    cb.checked = selected.has(d.id) && !cb.disabled;
-    cb.onchange = () => {
-      if (cb.checked) selected.add(d.id); else selected.delete(d.id);
-      renderDocs();
-    };
-
-    const name = document.createElement('label');
+    const name = document.createElement('span');
     name.className = 'name';
-    name.htmlFor = cb.id;
     name.textContent = d.title;
     if (d.error) name.title = d.error;
 
@@ -214,23 +308,40 @@ function renderDocs() {
     del.className = 'del';
     del.textContent = '×';
     del.title = 'Удалить';
-    del.onclick = async () => {
-      if (!confirm('Удалить документ "' + d.title + '"?')) return;
+    del.onclick = async e => {
+      e.stopPropagation();
+      if (!confirm('Удалить документ "' + d.title + '"? Его чат тоже удалится.')) return;
       await fetch('/api/documents/' + d.id, { method: 'DELETE' });
-      selected.delete(d.id);
-      loadDocs();
+      delete chats[String(d.id)];
+      if (current === String(d.id)) current = 'all';
+      saveChats();
+      await loadDocs();
+      renderChat();
     };
 
-    li.append(cb, name, badge, del);
+    if (ready) li.onclick = () => selectChat(String(d.id));
+    li.append(name, badge, del);
     docsEl.append(li);
   }
-  updateScope();
+  renderHead();
 }
 
 async function loadDocs() {
   const resp = await fetch('/api/documents');
   lastDocs = await resp.json();
+
+  //чаты удалённых документов выкидываем
+  const ids = new Set(lastDocs.map(d => String(d.id)));
+  let changed = false;
+  for (const k of Object.keys(chats)) {
+    if (k !== 'all' && !ids.has(k)) { delete chats[k]; changed = true; }
+  }
+  const lost = current !== 'all' && !ids.has(current);
+  if (lost) { current = 'all'; changed = true; }
+  if (changed) saveChats();
+
   renderDocs();
+  if (lost) renderChat();
 
   // опрос раз в 2 сек пока идёт обработка
   const busy = lastDocs.some(d => d.status === 'queued' || d.status === 'processing');
@@ -281,43 +392,6 @@ document.getElementById('textSend').onclick = async () => {
   loadDocs();
 };
 
-function addMsg(text, cls) {
-  const div = document.createElement('div');
-  div.className = 'msg ' + cls;
-  div.textContent = text;
-  messages.append(div);
-  messages.scrollTop = messages.scrollHeight;
-  return div;
-}
-
-function addBy(msgEl, modelId) {
-  const by = document.createElement('div');
-  by.className = 'by';
-  by.textContent = models[modelId] ? models[modelId].label : modelId;
-  msgEl.append(by);
-}
-
-function addSources(msgEl, sources) {
-  if (!sources.length) return;
-  const det = document.createElement('details');
-  det.className = 'sources';
-  const sum = document.createElement('summary');
-  sum.textContent = 'Источники (' + sources.length + ')';
-  det.append(sum);
-
-  for (const s of sources) {
-    const box = document.createElement('div');
-    box.className = 'src';
-    const head = document.createElement('b');
-    head.textContent = s.document + (s.page ? ', стр. ' + s.page : '') + ' · ' + s.score;
-    const body = document.createElement('div');
-    body.textContent = s.text;
-    box.append(head, body);
-    det.append(box);
-  }
-  msgEl.append(det);
-}
-
 document.getElementById('form').onsubmit = async e => {
   e.preventDefault();
   const input = document.getElementById('question');
@@ -336,38 +410,42 @@ document.getElementById('form').onsubmit = async e => {
     return;
   }
 
-  addMsg(question, 'user');
+  //чат где спросили, пока ждём ответ можно уйти в другой
+  const asked = current;
+  const userMsg = { role: 'user', text: question };
+  pushMsg(asked, userMsg);
+  drawMsg(userMsg);
+  renderHead();
   input.value = '';
   btn.disabled = true;
   const wait = addMsg('Ищу в документах и думаю...', 'bot wait');
 
   // null = по всем
-  const ids = pickedIds();
+  const ids = asked === 'all' ? null : [Number(asked)];
 
+  let reply;
   try {
     const headers = { 'Content-Type': 'application/json' };
     if (key) headers['X-LLM-Key'] = key;
     const resp = await fetch('/api/ask', {
       method: 'POST',
       headers,
-      body: JSON.stringify({ question, document_ids: ids.length ? ids : null, model: modelEl.value }),
+      body: JSON.stringify({ question, document_ids: ids, model: modelEl.value }),
     });
     const data = await resp.json();
-    wait.classList.remove('wait');
-    if (!resp.ok) {
-      wait.textContent = data.detail || 'Что-то пошло не так';
-    } else {
-      wait.textContent = data.answer;
-      addSources(wait, data.sources);
-      addBy(wait, data.model);
-    }
+    reply = resp.ok
+      ? { role: 'bot', text: data.answer, sources: data.sources, model: data.model }
+      : { role: 'bot', text: data.detail || 'Что-то пошло не так' };
   } catch (err) {
-    wait.classList.remove('wait');
-    wait.textContent = 'Сервер не отвечает';
+    reply = { role: 'bot', text: 'Сервер не отвечает' };
   }
+
+  wait.remove();
+  pushMsg(asked, reply);
+  if (current === asked) drawMsg(reply);
+  renderHead();
   btn.disabled = false;
-  messages.scrollTop = messages.scrollHeight;
 };
 
 loadModels();
-loadDocs();
+loadDocs().then(renderChat);

@@ -54,17 +54,22 @@
         <button id="textSend">Добавить</button>
       </details>
 
-      <p class="hint" id="pickHint" hidden>Отметь документ, чтобы искать только в нём. Если ничего не отмечено, ищем по всем.</p>
+      <p class="hint" id="pickHint" hidden>У каждого документа свой чат. «Все документы» это общий чат, там ищем по всем сразу.</p>
       <ul id="docs"></ul>
       <p class="hint" id="docsHint">Пока ничего не загружено</p>
     </aside>
 
     <section class="chat">
-      <div id="messages">
-        <div class="msg bot">Привет! Загрузи документ слева, а потом спрашивай, например про тарифы или условия.</div>
+      <div class="chat-head">
+        <div>
+          <b id="chatTitle"></b>
+          <span class="muted" id="chatSub"></span>
+        </div>
+        <button type="button" class="link" id="clearChat">Очистить чат</button>
       </div>
 
-      <div id="scope" class="scope"></div>
+      <div id="messages"></div>
+
       <form id="form">
         <input type="text" id="question" placeholder="Задай вопрос" autocomplete="off">
         <button type="submit" id="send">Спросить</button>
