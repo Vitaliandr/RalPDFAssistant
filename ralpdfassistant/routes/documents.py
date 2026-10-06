@@ -20,7 +20,7 @@ def list_documents(session: Session = Depends(get_session)) -> list[DocumentOut]
 def upload(
     file: UploadFile = File(...), session: Session = Depends(get_session), enqueue: Enqueue = Depends(enqueue_dep)
 ) -> DocumentOut:
-    # читаем с запасом в один байт, так видно что файл больше лимита и не грузим в память гигабайты
+    #+1 байт, чтоб понять что файл большой
     data = file.file.read(settings.max_upload_mb * 1024 * 1024 + 1)
     doc = service.upload_file(session, enqueue, file.filename or "", data)
     return DocumentOut.model_validate(doc)

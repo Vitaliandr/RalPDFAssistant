@@ -13,7 +13,7 @@ depends_on = None
 
 
 def upgrade() -> None:
-    #выражение такое же как в repositories/chunks.py, иначе postgres этот индекс не использует
+    # выражение как в запросе, иначе индекс не работает
     op.execute("CREATE INDEX chunks_fts_idx ON chunks USING gin (to_tsvector('russian', text))")
 
 

@@ -14,24 +14,23 @@ log = logging.getLogger(__name__)
 
 NO_DOCS = "Пока нет готовых документов, загрузи хотя бы один."
 
-#слова которые есть в любом вопросе и ничего не ищут
 STOP_WORDS = {
     "какой", "какая", "какие", "какое", "каков", "кто", "что", "сколько", "когда", "где", "как",
     "для", "при", "про", "это", "был", "была", "были", "есть", "или", "его", "ещё", "еще",
 }  # fmt: skip
 
-#стандартное значение для RRF, подбирать его под данные обычно не нужно
+#стандартное для rrf
 RRF_K = 60
 
 
 def keywords(question: str) -> str:
     words = [w for w in re.findall(r"[а-яёa-z0-9]+", question.lower()) if len(w) > 2 and w not in STOP_WORDS]
-    #любое слово из вопроса, а не все сразу. иначе одно лишнее слово обнулит выдачу
+    # любое слово, не все сразу
     return " | ".join(dict.fromkeys(words))
 
 
 def fuse(by_vector: list[Hit], by_words: list[Hit], limit: int) -> list[Hit]:
-    # reciprocal rank fusion: складываем 1/(k+место) из обоих списков, шкалы score сравнивать не надо
+    #rrf: 1/(k+место) из обоих списков, score не сравниваем
     points: dict[int, float] = {}
     hits: dict[int, Hit] = {}
     for found in (by_vector, by_words):

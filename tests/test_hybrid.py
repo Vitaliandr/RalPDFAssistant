@@ -21,7 +21,7 @@ def test_keywords_only_stop_words():
 
 
 def test_fuse_prefers_item_found_by_both():
-    #у id=2 места не лучшие, но он есть в обоих списках
+    #id=2 есть в обоих списках
     fused = ask.fuse([hit(1), hit(2), hit(3)], [hit(4), hit(2)], limit=5)
     assert fused[0].id == 2
 
@@ -38,7 +38,7 @@ def test_fuse_with_empty_lists():
 
 
 def test_word_search_knows_word_forms(client, process, session):
-    #в вопросе "вкладе", в тексте "вкладу": для векторов это разные слова, а морфология postgres их сводит
+    # вкладе и вкладу, postgres склеит
     add_text(client, "Вклад", "Ставка по вкладу четырнадцать процентов")
     add_text(client, "Погода", "Сегодня солнечно и тепло на улице")
     process()

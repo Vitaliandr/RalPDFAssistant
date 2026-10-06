@@ -15,7 +15,6 @@ def alembic_config() -> Config:
 
 
 def test_upgrade_and_downgrade(engine, session):
-    # база без наших таблиц, дальше всё делает alembic
     with engine.begin() as conn:
         conn.execute(text("DROP SCHEMA public CASCADE"))
         conn.execute(text("CREATE SCHEMA public"))
@@ -29,7 +28,7 @@ def test_upgrade_and_downgrade(engine, session):
     assert "ix_chunks_document_id" in indexes
     assert "chunks_embedding_idx" in indexes
 
-    #индекс по выражению sqlalchemy не отражает, смотрим в каталог postgres
+    #sqlalchemy такой индекс не видит
     fts = engine.connect().execute(text("select 1 from pg_indexes where indexname = 'chunks_fts_idx'")).scalar()
     assert fts == 1
 

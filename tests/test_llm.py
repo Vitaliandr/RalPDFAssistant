@@ -31,6 +31,19 @@ def test_normal_answer():
     assert "сколько?" in user_message
 
 
+def test_model_by_default_is_local():
+    seen = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen["url"] = str(request.url)
+        seen["auth"] = request.headers.get("authorization")
+        return httpx.Response(200, json=OK)
+
+    ask_llm("q", "c", None, client=client_with(handler))
+    assert "11434" in seen["url"]
+    assert seen["auth"] is None
+
+
 def test_local_model_gets_no_auth_header():
     seen = {}
 
@@ -46,8 +59,7 @@ def test_local_model_gets_no_auth_header():
     assert seen["model"] == settings.ollama_model
 
 
-def test_groq_goes_to_groq_with_key(monkeypatch):
-    monkeypatch.setattr(settings, "groq_api_key", "secret-key")
+def test_groq_goes_to_groq_with_users_key():
     seen = {}
 
     def handler(request: httpx.Request) -> httpx.Response:
@@ -56,33 +68,10 @@ def test_groq_goes_to_groq_with_key(monkeypatch):
         seen["model"] = json.loads(request.read())["model"]
         return httpx.Response(200, json=OK)
 
-    ask_llm("q", "c", "groq", client=client_with(handler))
-    assert seen["auth"] == "Bearer secret-key"
+    ask_llm("q", "c", "groq", "gsk_userkey", client_with(handler))
+    assert seen["auth"] == "Bearer gsk_userkey"
     assert seen["url"].startswith("https://api.groq.com/")
     assert seen["model"] == settings.groq_model
-
-
-def test_users_own_key_works_without_key_in_env():
-    seen = {}
-
-    def handler(request: httpx.Request) -> httpx.Response:
-        seen["auth"] = request.headers.get("authorization")
-        return httpx.Response(200, json=OK)
-
-    ask_llm("q", "c", "groq", "gsk_userkey", client_with(handler))
-    assert seen["auth"] == "Bearer gsk_userkey"
-
-
-def test_users_key_beats_key_from_env(monkeypatch):
-    monkeypatch.setattr(settings, "groq_api_key", "from-env")
-    seen = {}
-
-    def handler(request: httpx.Request) -> httpx.Response:
-        seen["auth"] = request.headers.get("authorization")
-        return httpx.Response(200, json=OK)
-
-    ask_llm("q", "c", "groq", "gsk_userkey", client_with(handler))
-    assert seen["auth"] == "Bearer gsk_userkey"
 
 
 def test_users_key_is_not_sent_to_local_model():
@@ -96,9 +85,19 @@ def test_users_key_is_not_sent_to_local_model():
     assert seen["auth"] is None
 
 
+def test_cloud_model_without_key_is_refused():
+    with pytest.raises(AppError) as e:
+        ask_llm("q", "c", "groq", client=client_with(lambda r: httpx.Response(200, json=OK)))
+    assert "нужен ключ" in e.value.message
+
+
+def test_unknown_model_is_refused():
+    with pytest.raises(AppError):
+        ask_llm("q", "c", "gpt-17", client=client_with(lambda r: httpx.Response(200, json=OK)))
+
+
 @pytest.mark.parametrize("bad", ["gsk abc", "gsk_\nabc", "a" * 300, "   ", "gsk_\tabc"])
 def test_weird_keys_are_refused(bad):
-    #все эти ключи отсекаются проверкой формата, до запроса к провайдеру дело не доходит
     with pytest.raises(AppError):
         ask_llm("q", "c", "groq", bad, client_with(lambda r: httpx.Response(200, json=OK)))
 
@@ -114,35 +113,11 @@ def test_key_with_spaces_around_is_trimmed():
     assert seen["auth"] == "Bearer gsk_userkey"
 
 
-def test_rejected_users_key_says_check_your_key():
+def test_rejected_key_says_check_your_key():
     with pytest.raises(LlmUnavailable) as e:
         ask_llm("q", "c", "groq", "gsk_bad", client_with(lambda r: httpx.Response(401, json={})))
     assert e.value.message == "Провайдер не принял ключ, проверь его"
     assert "gsk_bad" not in e.value.message
-
-
-def test_default_model_is_used_when_not_asked(monkeypatch):
-    monkeypatch.setattr(settings, "groq_api_key", "k")
-    monkeypatch.setattr(settings, "default_llm", "groq")
-    seen = {}
-
-    def handler(request: httpx.Request) -> httpx.Response:
-        seen["url"] = str(request.url)
-        return httpx.Response(200, json=OK)
-
-    ask_llm("q", "c", None, client=client_with(handler))
-    assert "groq.com" in seen["url"]
-
-
-def test_cloud_model_without_key_is_refused():
-    with pytest.raises(AppError) as e:
-        ask_llm("q", "c", "groq", client=client_with(lambda r: httpx.Response(200, json=OK)))
-    assert "нужен ключ" in e.value.message
-
-
-def test_unknown_model_is_refused():
-    with pytest.raises(AppError):
-        ask_llm("q", "c", "gpt-17", client=client_with(lambda r: httpx.Response(200, json=OK)))
 
 
 @pytest.mark.parametrize(
@@ -151,7 +126,7 @@ def test_unknown_model_is_refused():
 )
 def test_provider_errors_become_readable(code, part):
     with pytest.raises(LlmUnavailable) as e:
-        ask_llm("q", "c", client=client_with(lambda r: httpx.Response(code, json={})))
+        ask_llm("q", "c", "groq", "gsk_userkey", client_with(lambda r: httpx.Response(code, json={})))
     assert part in e.value.message
 
 
@@ -161,25 +136,25 @@ def test_local_model_unreachable_tells_what_to_do():
 
     with pytest.raises(LlmUnavailable) as e:
         ask_llm("q", "c", "ollama", client=client_with(handler))
-    #новый человек должен узнать два выхода: поставить ollama или взять облако со своим ключом
+    # два выхода: ollama или свой ключ
     assert "Запусти Ollama" in e.value.message
     assert f"ollama pull {settings.ollama_model}" in e.value.message
     assert "Groq" in e.value.message
 
 
-def test_cloud_unreachable_mentions_internet(monkeypatch):
+def test_cloud_unreachable_mentions_internet():
     def handler(request: httpx.Request) -> httpx.Response:
         raise httpx.ConnectError("нет связи")
 
     with pytest.raises(LlmUnavailable) as e:
-        ask_llm("q", "c", "groq", "gsk_userkey", client=client_with(handler))
+        ask_llm("q", "c", "groq", "gsk_userkey", client_with(handler))
     assert "интернет" in e.value.message
 
 
 def test_cloud_does_not_know_model():
     with pytest.raises(LlmUnavailable) as e:
-        ask_llm("q", "c", "groq", "gsk_userkey", client=client_with(lambda r: httpx.Response(404, json={})))
-    assert "название модели" in e.value.message
+        ask_llm("q", "c", "groq", "gsk_userkey", client_with(lambda r: httpx.Response(404, json={})))
+    assert "GROQ_MODEL" in e.value.message
 
 
 def test_model_not_pulled_in_ollama():

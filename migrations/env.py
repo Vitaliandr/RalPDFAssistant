@@ -3,14 +3,14 @@ from logging.config import fileConfig
 from alembic import context
 from sqlalchemy import create_engine
 
-#без импорта таблиц Base.metadata пустая
+#иначе metadata пустая
 from ralpdfassistant import tables  # noqa: F401
 from ralpdfassistant.database import Base
 from ralpdfassistant.settings import settings
 
 config = context.config
 if config.config_file_name is not None:
-    # в тестах миграции гоняются внутри pytest, его логи трогать не надо
+    # чтоб не гасить логи pytest
     fileConfig(config.config_file_name, disable_existing_loggers=False)
 
 target_metadata = Base.metadata

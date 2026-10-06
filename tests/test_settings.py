@@ -1,10 +1,10 @@
 import pytest
 
-from ralpdfassistant.settings import Settings
+from ralpdfassistant.settings import DEFAULT_MODEL, Settings
 
 
 def make(**kw: object) -> Settings:
-    # _env_file=None чтобы не подхватить настоящий .env
+    # без настоящего .env
     return Settings(_env_file=None, **kw)  # type: ignore[arg-type]
 
 
@@ -26,50 +26,35 @@ def test_unknown_embed_model():
         make(embed_model="что-то/левое")
 
 
-def test_without_keys_local_is_default_and_groq_waits_for_user_key():
-    s = make()
-    profiles = s.llm_profiles()
+def test_two_models_local_and_groq():
+    profiles = make().llm_profiles()
     assert list(profiles) == ["ollama", "groq"]
-    assert s.default_llm == "ollama"
+    assert DEFAULT_MODEL == "ollama"
     assert "11434" in profiles["ollama"].base_url
-    #ключа в .env нет, но модель в списке есть: человек вставит свой в интерфейсе
-    assert profiles["groq"].cloud and profiles["groq"].api_key == ""
+    assert "groq.com" in profiles["groq"].base_url
 
 
-def test_groq_key_in_env_makes_it_default():
-    s = make(groq_api_key="k")
-    assert s.default_llm == "groq"
-    assert "groq.com" in s.llm_profiles()["groq"].base_url
-    assert s.llm_profiles()["groq"].api_key == "k"
+def test_only_groq_is_cloud():
+    profiles = make().llm_profiles()
+    assert profiles["groq"].cloud is True
+    assert profiles["ollama"].cloud is False
 
 
-def test_default_can_be_local_even_with_key():
-    s = make(groq_api_key="k", default_llm="ollama")
-    assert s.default_llm == "ollama"
-
-
-def test_cloud_default_needs_key_in_env():
-    #иначе каждый вопрос сразу упирался бы в отказ
-    with pytest.raises(ValueError):
-        make(default_llm="groq")
-
-
-def test_unknown_default():
-    with pytest.raises(ValueError):
-        make(default_llm="abc")
-
-
-def test_model_override():
-    s = make(gemini_api_key="k", gemini_model="gemini-2.5-flash")
-    assert s.llm_profiles()["gemini"].model == "gemini-2.5-flash"
-
-
-def test_gemini_hidden_without_key():
-    assert "gemini" not in make().llm_profiles()
-
-
-def test_cloud_notes_say_what_leaves_the_machine():
-    s = make(groq_api_key="k")
+def test_models_can_be_changed():
+    s = make(ollama_model="llama3.1:8b", groq_model="llama-3.3-70b-versatile", ollama_base_url="http://pc:11434/v1")
     profiles = s.llm_profiles()
+    assert profiles["ollama"].model == "llama3.1:8b"
+    assert profiles["ollama"].base_url == "http://pc:11434/v1"
+    assert profiles["groq"].model == "llama-3.3-70b-versatile"
+
+
+def test_no_api_keys_in_settings():
+    #ключей в настройках быть не должно
+    fields = Settings.model_fields
+    assert not [name for name in fields if "api_key" in name or name.endswith("_key")]
+
+
+def test_notes_say_what_leaves_the_machine():
+    profiles = make().llm_profiles()
     assert "не уходит" in profiles["ollama"].note
     assert "уходят вопрос" in profiles["groq"].note

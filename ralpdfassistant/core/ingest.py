@@ -17,8 +17,7 @@ BATCH = 32
 
 def read_pages(path: Path) -> list[tuple[int | None, str]]:
     if path.suffix.lower() == ".pdf":
-        #pdfplumber собирает слова в строки по координатам, поэтому строки таблиц тарифов остаются целыми.
-        # pypdf отдавал сначала все названия строк, потом все значения, и модель путала что к чему
+        #pdfplumber держит строки таблиц целыми
         with pdfplumber.open(path) as pdf:
             return [(i + 1, page.extract_text() or "") for i, page in enumerate(pdf.pages)]
 
@@ -26,14 +25,13 @@ def read_pages(path: Path) -> list[tuple[int | None, str]]:
     try:
         text = raw.decode("utf-8")
     except UnicodeDecodeError:
-        # старые txt часто в cp1251
+        # старые txt в cp1251
         text = raw.decode("cp1251", errors="replace")
     return [(None, text)]
 
 
 def context_line(mode: str, title: str, page: int | None, page_text: str) -> str:
-    #кусок из середины таблицы сам по себе это просто числа. название документа, страница
-    # и заголовок страницы подсказывают эмбеддингу о чём вообще речь
+    #контекст перед куском, влияет только на вектр
     if mode == "off":
         return ""
     where = f"{title}, стр. {page}" if page else title
@@ -54,7 +52,6 @@ def process(session: Session, embedder: Embedder, doc_id: int) -> None:
         session.commit()
 
         pieces: list[tuple[int | None, str]] = []
-        #что именно уходит в эмбеддинг: контекст страницы плюс кусок. в базе кусок лежит без контекста
         to_embed: list[str] = []
         for page, text in read_pages(Path(doc.path)):
             context = context_line(settings.chunk_context, doc.title, page, text)
@@ -65,7 +62,7 @@ def process(session: Session, embedder: Embedder, doc_id: int) -> None:
             raise ValueError("В файле нет текста, возможно это скан")
 
         vectors: list[list[float]] = []
-        #пачками чтобы не упереться в память на больших pdf
+        # пачками, а то память
         for i in range(0, len(to_embed), BATCH):
             vectors.extend(embedder.embed_passages(to_embed[i : i + BATCH]))
 
@@ -76,7 +73,7 @@ def process(session: Session, embedder: Embedder, doc_id: int) -> None:
         log.info("документ %s готов, чанков %s", doc.id, len(pieces))
     except Exception as e:
         session.rollback()
-        # после rollback объект протух, берём заново
+        #после rollback берём заново
         doc = documents_repo.get(session, doc_id)
         if doc is not None:
             doc.status = "error"

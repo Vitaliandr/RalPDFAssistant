@@ -11,7 +11,7 @@ class Embedder(Protocol):
 
 class FastEmbedder:
     def __init__(self) -> None:
-        # импорт тут, иначе api и тесты тянут onnx ещё до того как модель понадобилась
+        #импорт тут, onnx тяжёлый
         from fastembed import TextEmbedding
 
         self.model = TextEmbedding(model_name=settings.embed_model, cache_dir=settings.models_dir)
@@ -28,7 +28,6 @@ _embedder: Embedder | None = None
 
 
 def get_embedder() -> Embedder:
-    #грузим один раз на процесс, модель весит больше 2 ГБ
     global _embedder
     if _embedder is None:
         _embedder = FastEmbedder()

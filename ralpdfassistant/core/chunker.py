@@ -7,14 +7,13 @@ def split_text(text: str, size: int = 800, overlap: int = 150) -> list[str]:
     if not text:
         return []
 
-    # режем по предложениям и абзацам чтобы не рвать мысль посередине
     parts = [p.strip() for p in re.split(r"(?<=[.!?])\s+|\n\n", text) if p.strip()]
 
     chunks: list[str] = []
     cur: list[str] = []
     cur_len = 0
     for part in parts:
-        #бывает одно предложение длиннее всего чанка, режем грубо
+        #длиннее чанка, режем грубо
         while len(part) > size:
             if cur:
                 chunks.append(" ".join(cur))
@@ -24,7 +23,6 @@ def split_text(text: str, size: int = 800, overlap: int = 150) -> list[str]:
 
         if cur_len + len(part) > size and cur:
             chunks.append(" ".join(cur))
-            # хвост прошлого чанка тащим в новый
             tail: list[str] = []
             tail_len = 0
             for s in reversed(cur):
@@ -32,7 +30,6 @@ def split_text(text: str, size: int = 800, overlap: int = 150) -> list[str]:
                     break
                 tail.insert(0, s)
                 tail_len += len(s) + 1
-            # если с хвостом не влезаем, хвост выкидываем
             if tail_len + len(part) > size:
                 tail, tail_len = [], 0
             cur, cur_len = tail, tail_len

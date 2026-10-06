@@ -30,7 +30,7 @@ def upgrade() -> None:
         sa.Column("created_at", sa.DateTime(), server_default=sa.func.now(), nullable=False),
     )
 
-    #размер вектора берём из настроек, если потом сменят модель api сам пересоздаст колонку (core/reindex.py)
+    #размер берём из настроек
     op.create_table(
         "chunks",
         sa.Column("id", sa.Integer(), primary_key=True),

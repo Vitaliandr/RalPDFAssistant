@@ -43,14 +43,14 @@ def search(session: Session, vec: list[float], doc_ids: list[int] | None, limit:
     return _hits(session.execute(query.order_by(dist).limit(limit)).all())
 
 
-#выражение должно совпадать с тем что в индексе chunks_fts_idx (миграция 0002), иначе индекс не подхватится
+#как в индексе, иначе он не сработает
 FTS_VECTOR = func.to_tsvector(literal_column("'russian'"), Chunk.text)
 
 
 def keyword_search(
     session: Session, vec: list[float], tsquery: str, doc_ids: list[int] | None, limit: int
 ) -> list[Hit]:
-    #score у таких кусков всё равно косинус, чтобы в интерфейсе везде была одна шкала
+    # score тут тоже косинус
     query, _ = _base_query(vec, doc_ids)
     ts = func.to_tsquery(literal_column("'russian'"), tsquery)
     query = query.where(FTS_VECTOR.op("@@")(ts)).order_by(func.ts_rank_cd(FTS_VECTOR, ts).desc())
@@ -58,7 +58,7 @@ def keyword_search(
 
 
 def vector_dim(session: Session) -> int | None:
-    # у pgvector размер лежит прямо в atttypmod
+    # размер лежит в atttypmod
     return session.execute(
         text(
             "select a.atttypmod from pg_attribute a join pg_class c on c.oid = a.attrelid "
@@ -68,7 +68,7 @@ def vector_dim(session: Session) -> int | None:
 
 
 def change_dim(session: Session, dim: int) -> None:
-    # старые векторы от другой модели всё равно бесполезны
+    #старые векторы не нужны
     session.execute(text("delete from chunks"))
     session.execute(text("drop index if exists chunks_embedding_idx"))
     session.execute(text(f"alter table chunks alter column embedding type vector({int(dim)})"))

@@ -1,4 +1,4 @@
-#свои исключения бизнес логики, в api превращаются в http ответы (main.py)
+#свои ошибки, дальше в http
 
 
 class AppError(Exception):

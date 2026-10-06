@@ -3,7 +3,7 @@ import logging
 import uuid
 from contextvars import ContextVar
 
-# id текущего запроса. contextvar а не глобальная переменная, запросы идут параллельно
+# contextvar, запросы идут параллельно
 request_id: ContextVar[str] = ContextVar("request_id", default="-")
 
 
@@ -14,7 +14,6 @@ class _AddRequestId(logging.Filter):
 
 
 class _JsonFormatter(logging.Formatter):
-    # для loki или elk, там удобнее искать по полям
     def format(self, record: logging.LogRecord) -> str:
         data = {
             "time": self.formatTime(record),
@@ -42,7 +41,7 @@ def setup(as_json: bool = False) -> None:
 
 
 def new_request_id(incoming: str | None) -> str:
-    #чужой id берём только если он похож на id, иначе в лог можно протащить что угодно
+    #не доверяем чужому id
     if incoming and len(incoming) <= 64 and incoming.replace("-", "").isalnum():
         return incoming
     return uuid.uuid4().hex[:12]

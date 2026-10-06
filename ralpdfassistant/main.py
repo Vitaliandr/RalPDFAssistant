@@ -25,13 +25,13 @@ CallNext = Callable[[Request], Awaitable[Response]]
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-    # таблицы создаёт alembic, тут только проверка что размер вектора совпадает с моделью
+    # таблицы делает alembic
     with SessionLocal() as session:
         ensure_vector_dim(session, enqueue_dep())
     yield
 
 
-#swagger можно выключить (DOCS=false), в проде карта всех ручек ни к чему
+#swagger в проде не нужен, DOCS=false
 app = FastAPI(
     title="RalPDFAssistant",
     lifespan=lifespan,
@@ -53,7 +53,7 @@ async def app_error_handler(request: Request, exc: AppError) -> JSONResponse:
 
 @app.exception_handler(Exception)
 async def unexpected_error_handler(request: Request, exc: Exception) -> JSONResponse:
-    # трейс только в лог, клиенту детали знать незачем
+    # трейс только в лог
     log.exception("необработанная ошибка на %s %s", request.method, request.url.path)
     return JSONResponse(status_code=500, content={"detail": "внутренняя ошибка, попробуйте позже"})
 
@@ -78,15 +78,14 @@ def _human_error(err: dict[str, Any]) -> str:
     return f"{field}: неверное значение"
 
 
-#ошибки pydantic по умолчанию на английском и списком, а интерфейсу нужна одна строка
+#pydantic по-английски, переводим
 @app.exception_handler(RequestValidationError)
 async def validation_error_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
     text = "; ".join(_human_error(e) for e in exc.errors())
     return JSONResponse(status_code=422, content={"detail": text})
 
 
-# без этого браузер берёт html js css из кэша и показывает старый интерфейс.
-# no-cache не запрещает кэш а заставляет спросить сервер
+# иначе браузер держит старый js
 @app.middleware("http")
 async def no_stale_frontend(request: Request, call_next: CallNext) -> Response:
     response = await call_next(request)
@@ -95,7 +94,7 @@ async def no_stale_frontend(request: Request, call_next: CallNext) -> Response:
     return response
 
 
-#браузер выполнит только наш app.js, чужой скрипт из загруженного документа не запустится
+# CSP: выполняется только наш app.js
 CSP = (
     "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; "
     "connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'"
@@ -107,15 +106,15 @@ async def security_headers(request: Request, call_next: CallNext) -> Response:
     response = await call_next(request)
     h = response.headers
     h["X-Content-Type-Options"] = "nosniff"
-    h["X-Frame-Options"] = "DENY"  #нельзя встроить в чужой сайт
+    h["X-Frame-Options"] = "DENY"  #от clickjacking
     h["Referrer-Policy"] = "no-referrer"
-    # swagger грузит скрипты с cdn, ему строгий CSP ломает страницу
+    # swagger с cdn, ему csp мешает
     if not request.url.path.startswith(("/docs", "/redoc", "/openapi.json")):
         h["Content-Security-Policy"] = CSP
     return response
 
 
-# объявлен последним значит выполняется первым, id есть уже во всех логах запроса
+#последний = первый на входе, id есть во всех логах
 @app.middleware("http")
 async def with_request_id(request: Request, call_next: CallNext) -> Response:
     rid = logs.new_request_id(request.headers.get("x-request-id"))
@@ -133,5 +132,5 @@ async def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
-#интерфейс, монтируем последним иначе он перекроет api
+# в конце, а то перекроет api
 app.mount("/", StaticFiles(directory=Path(__file__).parent / "web", html=True), name="web")

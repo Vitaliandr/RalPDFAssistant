@@ -9,5 +9,5 @@ celery = Celery(
     include=["ralpdfassistant.background.tasks"],
 )
 celery.conf.task_track_started = True
-#иначе celery 6 перестанет ждать брокер при старте, а redis в compose поднимается позже
+# redis поднимается позже
 celery.conf.broker_connection_retry_on_startup = True

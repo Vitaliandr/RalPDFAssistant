@@ -21,7 +21,7 @@ def test_other_dim_rebuilds_and_requeues(client, process, session, jobs):
     second = add_text(client, "два", "текст про условия вклада")
     process()
 
-    #как будто база осталась от старой модели с другим размером вектора
+    #как будто старая база
     chunks_repo.change_dim(session, 384)
     session.commit()
     assert chunks_repo.vector_dim(session) == 384
@@ -33,7 +33,6 @@ def test_other_dim_rebuilds_and_requeues(client, process, session, jobs):
     session.expire_all()
     assert {session.get(Document, i).status for i in (first, second)} == {"queued"}
 
-    # и после переиндексации всё снова находится
     process()
     hits = chunks_repo.search(session, [1.0] + [0.0] * (settings.embed_dim - 1), None, 5)
     assert len(hits) == 2

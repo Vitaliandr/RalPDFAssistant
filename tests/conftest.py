@@ -6,8 +6,7 @@ import zlib
 
 
 def _test_database_url() -> str:
-    # своя база (CI, или чтобы быстрее локально) через TEST_DATABASE_URL,
-    #иначе поднимаем чистый postgres с pgvector в докере на время тестов
+    #в CI база своя, локально в докере
     url = os.environ.get("TEST_DATABASE_URL")
     if url:
         return url
@@ -19,13 +18,9 @@ def _test_database_url() -> str:
     return pg.get_connection_url()
 
 
-# до импорта приложения, settings читаются один раз при импорте
+#до импорта, settings читаются раз
 os.environ["DATABASE_URL"] = _test_database_url()
 os.environ["UPLOADS_DIR"] = tempfile.mkdtemp(prefix="ralpdfassistant_")
-#настоящий .env тестам не нужен, ключи и модель по умолчанию задаём сами
-os.environ["GROQ_API_KEY"] = ""
-os.environ["GEMINI_API_KEY"] = ""
-os.environ["DEFAULT_LLM"] = ""
 os.environ["EMBED_MODEL"] = "intfloat/multilingual-e5-large"
 
 import io
@@ -47,8 +42,7 @@ from ralpdfassistant.settings import settings
 
 
 class HashEmbedder:
-    # вместо настоящей модели: слова раскладываются по осям вектора, так что похожие тексты
-    # действительно оказываются рядом и поиск в тестах что-то ранжирует
+    # заглушка: слова по осям вектора, похожие тексты рядом
     def _vec(self, text_: str) -> list[float]:
         vec = [0.0] * settings.embed_dim
         for word in re.findall(r"[а-яёa-z0-9]+", text_.lower()):
@@ -69,9 +63,7 @@ class FakeLlm:
         self.answer = "тестовый ответ"
         self.error: Exception | None = None
         self.calls: list[tuple[str, str]] = []
-        #какую модель просили в каждом вызове
         self.models: list[str | None] = []
-        #свой ключ пользователя, который пришёл с вопросом
         self.keys: list[str | None] = []
 
     def __call__(self, question: str, context: str, model: str | None = None, api_key: str | None = None) -> str:
@@ -87,7 +79,7 @@ class FakeLlm:
 def engine() -> Iterator[Engine]:
     engine = create_engine(settings.database_url)
     with engine.begin() as conn:
-        #drop_all спотыкается если в базе схема от старой версии, проще снести всё
+        #drop_all глючит на старой схеме
         conn.execute(text("DROP SCHEMA public CASCADE"))
         conn.execute(text("CREATE SCHEMA public"))
         conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
@@ -125,14 +117,14 @@ def client(engine: Engine, jobs: list[int], llm: FakeLlm) -> Iterator[TestClient
     app.dependency_overrides[embedder_dep] = lambda: HashEmbedder()
     app.dependency_overrides[llm_dep] = lambda: llm
 
-    # raise_server_exceptions=False чтобы 500 можно было проверить как ответ а не как падение теста
+    # чтоб 500 проверять как ответ
     yield TestClient(app, raise_server_exceptions=False)
     app.dependency_overrides.clear()
 
 
 @pytest.fixture
 def process(engine: Engine, jobs: list[int]) -> Any:
-    #то что в проде делает воркер: забирает из очереди и обрабатывает
+    #имитация воркера
     def run() -> None:
         while jobs:
             with Session(engine, expire_on_commit=False) as s:

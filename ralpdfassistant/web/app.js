@@ -15,10 +15,8 @@ const modelEl = document.getElementById('model');
 const modelNoteEl = document.getElementById('modelNote');
 const scopeEl = document.getElementById('scope');
 
-//id модели -> то что пришло с сервера (название, куда уходят данные)
 let models = {};
 
-//свои ключи людей. в браузере, на сервер уходят только вместе с вопросом
 const memKeys = {};
 
 function getKey(id) {
@@ -39,7 +37,7 @@ function maskKey(key) {
 const keyToggle = document.getElementById('keyToggle');
 const keyBox = document.getElementById('keyBox');
 
-//панель с ключом открыта или свёрнута, и показан ли ключ целиком а не маской
+//открыта ли панель, виден ли ключ
 let keyOpen = false;
 let keyRevealed = false;
 
@@ -52,12 +50,6 @@ function isCloud() {
   return !!(m && m.cloud);
 }
 
-//у сервера своего ключа нет, значит без ключа человека ответа не будет
-function needsKey() {
-  const m = curModel();
-  return !!(m && m.needs_key);
-}
-
 function updateKeyBox() {
   keyToggle.hidden = !isCloud();
   if (!isCloud()) {
@@ -65,14 +57,10 @@ function updateKeyBox() {
     return;
   }
 
-  const m = curModel();
   const key = getKey(modelEl.value);
 
-  //на кнопке сразу видно чей ключ работает, открывать панель ради этого не надо
-  if (key) keyToggle.textContent = 'Ключ: свой';
-  else if (m.server_key) keyToggle.textContent = 'Ключ: сервера';
-  else keyToggle.textContent = 'Ключ не задан';
-  keyToggle.classList.toggle('warn', !key && !m.server_key);
+  keyToggle.textContent = key ? 'Ключ: задан' : 'Ключ не задан';
+  keyToggle.classList.toggle('warn', !key);
 
   keyBox.hidden = !keyOpen;
   document.getElementById('keyForm').hidden = !!key;
@@ -80,11 +68,9 @@ function updateKeyBox() {
   document.getElementById('keyMask').textContent = key ? (keyRevealed ? key : maskKey(key)) : '';
   document.getElementById('keyReveal').textContent = keyRevealed ? 'скрыть' : 'показать';
 
-  //ключ сервера из .env не показываем и не удаляем отсюда, только говорим что он используется
-  const status = document.getElementById('keyStatus');
-  if (key) status.textContent = 'Используется твой ключ' + (m.server_key ? ' (он заменяет ключ сервера)' : '');
-  else if (m.server_key) status.textContent = 'Используется ключ сервера. Можно вставить свой, он заменит серверный.';
-  else status.textContent = 'Ключ не задан. Вставь свой, чтобы пользоваться этой моделью.';
+  document.getElementById('keyStatus').textContent = key
+    ? 'Ключ сохранён в этом браузере.'
+    : 'Ключ не задан. Вставь свой, чтобы пользоваться облачной моделью.';
 }
 
 keyToggle.onclick = () => {
@@ -103,6 +89,7 @@ document.getElementById('keySave').onclick = () => {
   setKey(modelEl.value, value);
   input.value = '';
   keyRevealed = false;
+  keyOpen = false;
   updateKeyBox();
 };
 
@@ -121,8 +108,8 @@ document.getElementById('keyForget').onclick = () => {
 function showModelNote() {
   const m = curModel();
   modelNoteEl.textContent = m ? m.note : '';
-  //панель сама раскрывается только там где без ключа не обойтись
-  keyOpen = needsKey() && !getKey(modelEl.value);
+  //открываем сами, если ключа нет
+  keyOpen = isCloud() && !getKey(modelEl.value);
   keyRevealed = false;
   updateKeyBox();
 }
@@ -141,7 +128,7 @@ async function loadModels() {
     modelEl.append(opt);
   }
 
-  //прошлый выбор помним между перезагрузками, но только если такая модель ещё есть
+  // прошлый выбор, если ещё есть
   let saved = null;
   try { saved = localStorage.getItem('model'); } catch (e) { /* без хранилища тоже живём */ }
   const def = list.find(m => m.default) || list[0];
@@ -156,7 +143,7 @@ modelEl.onchange = () => {
 };
 const pickHintEl = document.getElementById('pickHint');
 
-//какие документы выбраны. пусто значит ищем по всем готовым
+//пусто = ищем по всем
 const selected = new Set();
 let lastDocs = [];
 let timer = null;
@@ -166,7 +153,6 @@ function readyDocs() {
 }
 
 function pickedIds() {
-  // выбранный документ мог успеть удалиться, такие id отбрасываем
   return readyDocs().filter(d => selected.has(d.id)).map(d => d.id);
 }
 
@@ -214,7 +200,6 @@ function renderDocs() {
       renderDocs();
     };
 
-    //название тоже кликабельно, так проще попасть чем в маленькую галочку
     const name = document.createElement('label');
     name.className = 'name';
     name.htmlFor = cb.id;
@@ -247,7 +232,7 @@ async function loadDocs() {
   lastDocs = await resp.json();
   renderDocs();
 
-  // пока что-то обрабатывается опрашиваем список раз в 2 сек
+  // опрос раз в 2 сек пока идёт обработка
   const busy = lastDocs.some(d => d.status === 'queued' || d.status === 'processing');
   clearTimeout(timer);
   if (busy) timer = setTimeout(loadDocs, 2000);
@@ -306,7 +291,6 @@ function addMsg(text, cls) {
 }
 
 function addBy(msgEl, modelId) {
-  //подпись под ответом, чтобы потом было видно какая модель отвечала
   const by = document.createElement('div');
   by.className = 'by';
   by.textContent = models[modelId] ? models[modelId].label : modelId;
@@ -341,10 +325,10 @@ document.getElementById('form').onsubmit = async e => {
   const question = input.value.trim();
   if (!question) return;
 
-  //свой ключ отправляем всегда если он есть, он важнее серверного
+  //локальной ключ не нужен
   const key = isCloud() ? getKey(modelEl.value) : '';
-  //а если ключа нет нигде, спрашивать бессмысленно: открываем панель и говорим что делать
-  if (needsKey() && !key) {
+  //нет ключа, открываем панель
+  if (isCloud() && !key) {
     addMsg('Для этой модели нужен ключ: вставь его в панели «Ключ» вверху страницы или выбери локальную модель.', 'bot');
     keyOpen = true;
     updateKeyBox();
@@ -357,7 +341,7 @@ document.getElementById('form').onsubmit = async e => {
   btn.disabled = true;
   const wait = addMsg('Ищу в документах и думаю...', 'bot wait');
 
-  //если ничего не выбрано шлём null, сервер ищет по всем
+  // null = по всем
   const ids = pickedIds();
 
   try {

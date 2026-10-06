@@ -1,12 +1,11 @@
-# то что роуты получают через Depends. тут всё что ходит наружу (очередь, модели),
-# в тестах эти функции подменяются через dependency_overrides
+# тут то что в тестах подменяем
 from ralpdfassistant.clients.embeddings import Embedder, get_embedder
 from ralpdfassistant.clients.llm import Llm, ask_llm
 from ralpdfassistant.core.documents import Enqueue
 
 
 def enqueue_dep() -> Enqueue:
-    #импорт внутри, чтобы api не поднимал celery пока никто не загрузил файл
+    #celery только когда надо
     from ralpdfassistant.background.tasks import process_document
 
     return process_document.delay

@@ -40,7 +40,7 @@ class Chunk(Base):
     document: Mapped[Document] = relationship(back_populates="chunks")
 
     __table_args__ = (
-        #поиск по словам, русская морфология: "обслуживании" найдёт "обслуживание"
+        #для поиска по словам
         Index("chunks_fts_idx", sql_text("to_tsvector('russian', text)"), postgresql_using="gin"),
         Index(
             "chunks_embedding_idx",

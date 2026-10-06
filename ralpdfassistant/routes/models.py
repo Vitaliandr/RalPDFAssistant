@@ -9,14 +9,5 @@ router = APIRouter(prefix="/api/models", tags=["models"])
 @router.get("", response_model=list[ModelOut])
 def list_models() -> list[ModelOut]:
     return [
-        ModelOut(
-            id=m.id,
-            label=m.label,
-            note=m.note,
-            default=m.default,
-            cloud=m.cloud,
-            server_key=m.server_key,
-            needs_key=m.needs_key,
-        )
-        for m in service.list_models()
+        ModelOut(id=m.id, label=m.label, note=m.note, default=m.default, cloud=m.cloud) for m in service.list_models()
     ]

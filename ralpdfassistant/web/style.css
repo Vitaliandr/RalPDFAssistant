@@ -14,7 +14,7 @@ body {
   font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
   background: var(--bg);
   color: var(--text);
-  /* шапка своей высоты, main забирает остальное, так высоту шапки не надо считать руками */
+  /* main берёт остаток высоты */
   height: 100vh;
   display: flex;
   flex-direction: column;
@@ -153,11 +153,10 @@ details button { margin-top: 8px; }
 .scope .link { background: none; color: var(--accent); padding: 0; font-size: 13px; text-decoration: underline; }
 
 #form { display: flex; gap: 8px; padding-top: 8px; }
-/* min-width: 0 иначе поле не сжимается меньше своего текста и вылезает за форму */
+/* иначе поле вылезает */
 #question { flex: 1; min-width: 0; }
 
 @media (max-width: 800px) {
-  /* на телефоне страница просто листается, высоту экрана никому не отдаём */
   body { height: auto; display: block; }
   header { padding: 16px 12px 4px; }
   .model-panel { width: 100%; }

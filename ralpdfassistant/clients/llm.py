@@ -3,10 +3,9 @@ from collections.abc import Callable
 import httpx
 
 from ralpdfassistant.errors import AppError, LlmUnavailable
-from ralpdfassistant.settings import LlmProfile, settings
+from ralpdfassistant.settings import DEFAULT_MODEL, LlmProfile, settings
 
-#вопрос, контекст, id модели (None значит по умолчанию), свой ключ пользователя (None значит из .env).
-# отдаёт текст ответа, в тестах подменяется
+#в тестах подменяем
 Llm = Callable[[str, str, str | None, str | None], str]
 
 SYSTEM_PROMPT = (
@@ -19,16 +18,16 @@ SYSTEM_PROMPT = (
 )
 
 
-def _status_text(code: int, own_key: bool, profile: LlmProfile) -> str:
+def _status_text(code: int, profile: LlmProfile) -> str:
     if code in (401, 403):
-        return "Провайдер не принял ключ, проверь его" if own_key else "Провайдер не принял ключ, проверь ключ в .env"
+        return "Провайдер не принял ключ, проверь его"
     if code == 429:
         return "Упёрлись в лимит бесплатного тарифа, подожди минуту"
     if code == 404 and not profile.cloud:
-        #ollama отвечает 404 когда модель не скачана, это самое частое у нового человека
+        # 404 у ollama = модель не скачана
         return f"Модель не скачана в Ollama: выполни в терминале ollama pull {profile.model}"
     if code == 404:
-        return "Провайдер не знает такую модель, проверь название модели в .env"
+        return "Провайдер не знает такую модель, проверь название в настройках GROQ_MODEL"
     return f"Модель вернула ошибку {code}"
 
 
@@ -43,7 +42,7 @@ def _unreachable_text(profile: LlmProfile) -> str:
 
 def clean_key(key: str) -> str:
     key = key.strip()
-    #в заголовок уходит как есть, поэтому пробелы и переводы строк внутри ключа сразу отсекаем
+    #в заголовок, пробелы нельзя
     if not key or len(key) > 200 or any(c.isspace() or not c.isprintable() for c in key):
         raise AppError("Ключ выглядит неправильно, вставь его целиком без пробелов")
     return key
@@ -56,19 +55,15 @@ def ask_llm(
     api_key: str | None = None,
     client: httpx.Client | None = None,
 ) -> str:
-    profile = settings.llm_profiles().get(model or settings.default_llm)
+    profile = settings.llm_profiles().get(model or DEFAULT_MODEL)
     if profile is None:
         raise AppError("Эта модель недоступна: неизвестное имя")
 
-    #свой ключ пользователя важнее чем из .env, но только для облачных моделей
-    own_key = bool(api_key) and profile.cloud
-    key = clean_key(api_key) if own_key and api_key else profile.api_key
-    if profile.cloud and not key:
-        raise AppError("Для облачной модели нужен ключ: вставь свой в панели «Ключ» вверху страницы")
-
     headers = {}
-    if key:
-        headers["Authorization"] = f"Bearer {key}"
+    if profile.cloud:
+        if not api_key:
+            raise AppError("Для облачной модели нужен ключ: вставь свой в панели «Ключ» вверху страницы")
+        headers["Authorization"] = f"Bearer {clean_key(api_key)}"
 
     body = {
         "model": profile.model,
@@ -78,14 +73,14 @@ def ask_llm(
             {"role": "user", "content": f"Фрагменты документов:\n\n{context}\n\nВопрос: {question}"},
         ],
     }
-    #на cpu 7b думает долго, таймаут большой
+    # на cpu долго, таймаут большой
     http = client or httpx.Client(timeout=600)
     try:
         resp = http.post(f"{profile.base_url}/chat/completions", json=body, headers=headers)
         resp.raise_for_status()
         return str(resp.json()["choices"][0]["message"]["content"]).strip()
     except httpx.HTTPStatusError as e:
-        raise LlmUnavailable(_status_text(e.response.status_code, own_key, profile)) from None
+        raise LlmUnavailable(_status_text(e.response.status_code, profile)) from None
     except httpx.HTTPError:
         raise LlmUnavailable(_unreachable_text(profile)) from None
     except (KeyError, IndexError, ValueError):

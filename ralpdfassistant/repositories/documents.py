@@ -1,4 +1,4 @@
-#все запросы к documents. коммитов тут нет, транзакцией управляет сервис
+#коммитит сервис, тут нет
 from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
@@ -23,7 +23,6 @@ def delete(session: Session, doc: Document) -> None:
 
 
 def requeue_all(session: Session) -> list[int]:
-    # статус сбрасываем одним запросом, id нужны чтобы кинуть задачи в очередь
     ids = list(session.scalars(select(Document.id)))
     session.execute(update(Document).values(status="queued", chunks_count=0, error=None))
     return ids

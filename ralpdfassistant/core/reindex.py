@@ -11,7 +11,7 @@ log = logging.getLogger(__name__)
 
 
 def ensure_vector_dim(session: Session, enqueue: Enqueue) -> bool:
-    #если сменили модель эмбеддингов то размер вектора в таблице уже не тот
+    # модель сменили, размер другой
     dim = chunks_repo.vector_dim(session)
     if dim is None or dim == settings.embed_dim:
         return False

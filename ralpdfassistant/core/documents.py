@@ -10,7 +10,6 @@ from ralpdfassistant.repositories import documents as documents_repo
 from ralpdfassistant.settings import settings
 from ralpdfassistant.tables import Document
 
-# кладёт id документа в очередь на обработку, в тестах подменяется
 Enqueue = Callable[[int], object]
 
 ALLOWED = {".pdf", ".txt", ".md"}
@@ -27,7 +26,7 @@ def _save_and_queue(session: Session, enqueue: Enqueue, title: str, data: bytes,
     doc = Document(title=title[:255], path=str(path))
     documents_repo.add(session, doc)
     session.commit()
-    #задачу кидаем после коммита, иначе воркер может не найти документ
+    #после комита, а то воркер не найдёт
     enqueue(doc.id)
     log.info("документ %s принят (%s, %s байт)", doc.id, suffix, len(data))
     return doc
