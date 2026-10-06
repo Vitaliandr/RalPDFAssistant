@@ -8,8 +8,33 @@
 </head>
 <body>
   <header>
-    <h1>RalPDFAssistant</h1>
-    <p>Загрузи PDF или текст и задавай вопросы по содержимому</p>
+    <div>
+      <h1>RalPDFAssistant</h1>
+      <p>Загрузи PDF или текст и задавай вопросы по содержимому</p>
+    </div>
+
+    <div class="model-panel">
+      <div class="model-row">
+        <label for="model">Модель</label>
+        <select id="model"></select>
+        <button type="button" id="keyToggle" class="keytoggle" hidden>Ключ</button>
+      </div>
+      <p class="hint model-note" id="modelNote"></p>
+
+      <div class="key-box" id="keyBox" hidden>
+        <p class="key-status" id="keyStatus"></p>
+        <div class="key-form" id="keyForm">
+          <input type="password" id="keyInput" placeholder="Вставь свой ключ (gsk_...)" autocomplete="off">
+          <button type="button" id="keySave">Сохранить</button>
+        </div>
+        <div class="key-saved" id="keySaved" hidden>
+          <code id="keyMask"></code>
+          <button type="button" class="link" id="keyReveal">показать</button>
+          <button type="button" class="link" id="keyForget">удалить</button>
+        </div>
+        <p class="hint">Свой ключ хранится только в этом браузере и уходит на сервер вместе с вопросом, там он не сохраняется. <a href="https://console.groq.com/keys" target="_blank" rel="noopener noreferrer">Получить бесплатный ключ</a></p>
+      </div>
+    </div>
   </header>
 
   <main>

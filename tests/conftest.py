@@ -22,11 +22,10 @@ def _test_database_url() -> str:
 # до импорта приложения, settings читаются один раз при импорте
 os.environ["DATABASE_URL"] = _test_database_url()
 os.environ["UPLOADS_DIR"] = tempfile.mkdtemp(prefix="ralpdfassistant_")
-#настоящий .env тестам не нужен, ключи и провайдера задаём сами
-os.environ["LLM_PROVIDER"] = "ollama"
-os.environ["LLM_API_KEY"] = ""
-os.environ["LLM_MODEL"] = ""
-os.environ["LLM_BASE_URL"] = ""
+#настоящий .env тестам не нужен, ключи и модель по умолчанию задаём сами
+os.environ["GROQ_API_KEY"] = ""
+os.environ["GEMINI_API_KEY"] = ""
+os.environ["DEFAULT_LLM"] = ""
 os.environ["EMBED_MODEL"] = "intfloat/multilingual-e5-large"
 
 import io
@@ -70,9 +69,15 @@ class FakeLlm:
         self.answer = "тестовый ответ"
         self.error: Exception | None = None
         self.calls: list[tuple[str, str]] = []
+        #какую модель просили в каждом вызове
+        self.models: list[str | None] = []
+        #свой ключ пользователя, который пришёл с вопросом
+        self.keys: list[str | None] = []
 
-    def __call__(self, question: str, context: str) -> str:
+    def __call__(self, question: str, context: str, model: str | None = None, api_key: str | None = None) -> str:
         self.calls.append((question, context))
+        self.models.append(model)
+        self.keys.append(api_key)
         if self.error:
             raise self.error
         return self.answer

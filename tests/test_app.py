@@ -22,6 +22,7 @@ def test_frontend_is_served_in_russian(client):
     r = client.get("/")
     assert r.status_code == 200
     assert "RalPDFAssistant" in r.text
+    assert 'id="model"' in r.text
     assert r.headers["cache-control"] == "no-cache"
 
 

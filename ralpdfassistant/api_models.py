@@ -22,6 +22,8 @@ class TextIn(BaseModel):
 class AskIn(BaseModel):
     question: str
     document_ids: list[int] | None = None
+    #id модели из /api/models, без него берётся та что по умолчанию
+    model: str | None = None
 
 
 class SourceOut(BaseModel):
@@ -34,3 +36,15 @@ class SourceOut(BaseModel):
 class AskOut(BaseModel):
     answer: str
     sources: list[SourceOut]
+    #какая модель реально отвечала
+    model: str
+
+
+class ModelOut(BaseModel):
+    id: str
+    label: str
+    note: str
+    default: bool
+    cloud: bool
+    server_key: bool
+    needs_key: bool

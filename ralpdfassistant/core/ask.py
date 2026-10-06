@@ -70,7 +70,13 @@ def build_context(hits: list[Hit]) -> str:
 
 
 def answer(
-    session: Session, embedder: Embedder, llm: Llm, question: str, doc_ids: list[int] | None
+    session: Session,
+    embedder: Embedder,
+    llm: Llm,
+    question: str,
+    doc_ids: list[int] | None,
+    model: str | None = None,
+    api_key: str | None = None,
 ) -> tuple[str, list[Hit]]:
     question = question.strip()
     if not question:
@@ -81,4 +87,4 @@ def answer(
         return NO_DOCS, []
 
     log.info("вопрос по %s фрагментам, лучший score %s", len(hits), hits[0].score)
-    return llm(question, build_context(hits)), hits
+    return llm(question, build_context(hits), model, api_key), hits

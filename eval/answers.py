@@ -20,6 +20,7 @@ def main():
     ap.add_argument("--questions", default="eval/answers_tariffs.json")
     ap.add_argument("--doc-id", type=int, action="append", help="по умолчанию ищем по всем документам")
     ap.add_argument("--pause", type=float, default=12, help="пауза между вопросами, чтобы не упереться в лимит")
+    ap.add_argument("--model", default=None, help="ollama или groq, по умолчанию та что в настройках")
     args = ap.parse_args()
 
     data = json.load(open(args.questions, encoding="utf-8"))
@@ -30,7 +31,7 @@ def main():
         for item in data:
             for _ in range(3):
                 try:
-                    text, hits = ask.answer(session, embedder, ask_llm, item["q"], args.doc_id)
+                    text, hits = ask.answer(session, embedder, ask_llm, item["q"], args.doc_id, args.model)
                     break
                 except LlmUnavailable as e:
                     #у облачных провайдеров бывают 503 и 429, ждём и пробуем ещё раз

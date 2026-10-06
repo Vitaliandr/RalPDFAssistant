@@ -14,7 +14,7 @@ from ralpdfassistant.core.reindex import ensure_vector_dim
 from ralpdfassistant.database import SessionLocal
 from ralpdfassistant.deps import enqueue_dep
 from ralpdfassistant.errors import AppError
-from ralpdfassistant.routes import chat, documents
+from ralpdfassistant.routes import chat, documents, models
 from ralpdfassistant.settings import settings
 
 logs.setup(as_json=settings.log_json)
@@ -42,6 +42,7 @@ app = FastAPI(
 
 app.include_router(documents.router)
 app.include_router(chat.router)
+app.include_router(models.router)
 
 
 @app.exception_handler(AppError)
@@ -63,6 +64,7 @@ FIELDS = {
     "title": "Название",
     "file": "Файл",
     "document_ids": "Документы",
+    "model": "Модель",
 }
 
 
