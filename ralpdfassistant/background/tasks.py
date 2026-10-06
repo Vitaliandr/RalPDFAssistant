@@ -7,4 +7,10 @@ from ralpdfassistant.database import SessionLocal
 @celery.task(name="process_document")
 def process_document(doc_id: int) -> None:
     with SessionLocal() as session:
-        ingest.process(session, get_embedder(), doc_id)
+        try:
+            embedder = get_embedder()
+        except Exception as e:
+            # без этого документ висит в очереди вечно
+            ingest.mark_error(session, doc_id, f"Не загрузилась модель эмбеддингов: {e}")
+            raise
+        ingest.process(session, embedder, doc_id)

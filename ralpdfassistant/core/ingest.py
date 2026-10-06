@@ -42,6 +42,17 @@ def context_line(mode: str, title: str, page: int | None, page_text: str) -> str
     return f"{where}\n"
 
 
+def mark_error(session: Session, doc_id: int, message: str) -> None:
+    session.rollback()
+    #после rollback берём заново
+    doc = documents_repo.get(session, doc_id)
+    if doc is not None:
+        doc.status = "error"
+        doc.error = message[:500]
+        session.commit()
+    log.warning("документ %s не обработан: %s", doc_id, message)
+
+
 def process(session: Session, embedder: Embedder, doc_id: int) -> None:
     doc = documents_repo.get(session, doc_id)
     if doc is None:
@@ -72,11 +83,4 @@ def process(session: Session, embedder: Embedder, doc_id: int) -> None:
         session.commit()
         log.info("документ %s готов, чанков %s", doc.id, len(pieces))
     except Exception as e:
-        session.rollback()
-        #после rollback берём заново
-        doc = documents_repo.get(session, doc_id)
-        if doc is not None:
-            doc.status = "error"
-            doc.error = str(e)[:500]
-            session.commit()
-        log.warning("документ %s не обработан: %s", doc_id, e)
+        mark_error(session, doc_id, str(e))
