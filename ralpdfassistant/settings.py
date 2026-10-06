@@ -1,3 +1,5 @@
+from typing import Literal
+
 from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -41,6 +43,9 @@ class Settings(BaseSettings):
     chunk_size: int = 800
     chunk_overlap: int = 150
     top_k: int = 6
+    # что дописывать перед куском при подсчёте эмбеддинга: off ничего, title название и страницу,
+    #head ещё и первые слова страницы (там обычно заголовок таблицы и единицы измерения)
+    chunk_context: Literal["off", "title", "head"] = "title"
     #гибридный поиск: векторы плюс слова. кандидатов берём с запасом, потом склеиваем и режем до top_k
     hybrid: bool = True
     candidates: int = 30

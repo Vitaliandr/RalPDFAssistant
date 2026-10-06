@@ -29,6 +29,7 @@
         <button id="textSend">Добавить</button>
       </details>
 
+      <p class="hint" id="pickHint" hidden>Отметь документ, чтобы искать только в нём. Если ничего не отмечено, ищем по всем.</p>
       <ul id="docs"></ul>
       <p class="hint" id="docsHint">Пока ничего не загружено</p>
     </aside>
@@ -38,8 +39,9 @@
         <div class="msg bot">Привет! Загрузи документ слева, а потом спрашивай, например про тарифы или условия.</div>
       </div>
 
+      <div id="scope" class="scope"></div>
       <form id="form">
-        <input type="text" id="question" placeholder="Твой вопрос по документам" autocomplete="off">
+        <input type="text" id="question" placeholder="Задай вопрос" autocomplete="off">
         <button type="submit" id="send">Спросить</button>
       </form>
     </section>

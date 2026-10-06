@@ -11,29 +11,71 @@ const messages = document.getElementById('messages');
 const dropEl = document.getElementById('drop');
 const fileEl = document.getElementById('file');
 
-// какие документы отмечены галочкой, по умолчанию все готовые
-const unchecked = new Set();
+const scopeEl = document.getElementById('scope');
+const pickHintEl = document.getElementById('pickHint');
+
+//какие документы выбраны. пусто значит ищем по всем готовым
+const selected = new Set();
+let lastDocs = [];
 let timer = null;
 
-async function loadDocs() {
-  const resp = await fetch('/api/documents');
-  const docs = await resp.json();
+function readyDocs() {
+  return lastDocs.filter(d => d.status === 'ready');
+}
 
-  hintEl.style.display = docs.length ? 'none' : 'block';
+function pickedIds() {
+  // выбранный документ мог успеть удалиться, такие id отбрасываем
+  return readyDocs().filter(d => selected.has(d.id)).map(d => d.id);
+}
+
+function updateScope() {
+  const ready = readyDocs();
+  const picked = ready.filter(d => selected.has(d.id));
+  scopeEl.innerHTML = '';
+
+  const text = document.createElement('span');
+  if (!ready.length) {
+    text.textContent = 'Нет готовых документов';
+  } else if (!picked.length) {
+    text.textContent = 'Ищу по всем документам (' + ready.length + ')';
+  } else {
+    text.textContent = 'Ищу только в: ' + picked.map(d => d.title).join(', ');
+  }
+  scopeEl.append(text);
+
+  if (picked.length) {
+    const reset = document.createElement('button');
+    reset.type = 'button';
+    reset.className = 'link';
+    reset.textContent = 'искать по всем';
+    reset.onclick = () => { selected.clear(); renderDocs(); };
+    scopeEl.append(reset);
+  }
+}
+
+function renderDocs() {
+  hintEl.style.display = lastDocs.length ? 'none' : 'block';
+  pickHintEl.hidden = readyDocs().length < 2;
   docsEl.innerHTML = '';
 
-  for (const d of docs) {
+  for (const d of lastDocs) {
     const li = document.createElement('li');
+    if (selected.has(d.id) && d.status === 'ready') li.className = 'picked';
 
     const cb = document.createElement('input');
     cb.type = 'checkbox';
+    cb.id = 'doc' + d.id;
     cb.disabled = d.status !== 'ready';
-    cb.checked = !unchecked.has(d.id);
-    cb.dataset.id = d.id;
-    cb.onchange = () => cb.checked ? unchecked.delete(d.id) : unchecked.add(d.id);
+    cb.checked = selected.has(d.id) && !cb.disabled;
+    cb.onchange = () => {
+      if (cb.checked) selected.add(d.id); else selected.delete(d.id);
+      renderDocs();
+    };
 
-    const name = document.createElement('span');
+    //название тоже кликабельно, так проще попасть чем в маленькую галочку
+    const name = document.createElement('label');
     name.className = 'name';
+    name.htmlFor = cb.id;
     name.textContent = d.title;
     if (d.error) name.title = d.error;
 
@@ -48,15 +90,23 @@ async function loadDocs() {
     del.onclick = async () => {
       if (!confirm('Удалить документ "' + d.title + '"?')) return;
       await fetch('/api/documents/' + d.id, { method: 'DELETE' });
+      selected.delete(d.id);
       loadDocs();
     };
 
     li.append(cb, name, badge, del);
     docsEl.append(li);
   }
+  updateScope();
+}
+
+async function loadDocs() {
+  const resp = await fetch('/api/documents');
+  lastDocs = await resp.json();
+  renderDocs();
 
   // пока что-то обрабатывается опрашиваем список раз в 2 сек
-  const busy = docs.some(d => d.status === 'queued' || d.status === 'processing');
+  const busy = lastDocs.some(d => d.status === 'queued' || d.status === 'processing');
   clearTimeout(timer);
   if (busy) timer = setTimeout(loadDocs, 2000);
 }
@@ -146,8 +196,8 @@ document.getElementById('form').onsubmit = async e => {
   btn.disabled = true;
   const wait = addMsg('Ищу в документах и думаю...', 'bot wait');
 
-  //если ничего не отмечено шлём null, ищем по всем
-  const ids = [...docsEl.querySelectorAll('input[type=checkbox]:checked')].map(c => Number(c.dataset.id));
+  //если ничего не выбрано шлём null, сервер ищет по всем
+  const ids = pickedIds();
 
   try {
     const resp = await fetch('/api/ask', {

@@ -31,6 +31,19 @@ def read_pages(path: Path) -> list[tuple[int | None, str]]:
     return [(None, text)]
 
 
+def context_line(mode: str, title: str, page: int | None, page_text: str) -> str:
+    #кусок из середины таблицы сам по себе это просто числа. название документа, страница
+    # и заголовок страницы подсказывают эмбеддингу о чём вообще речь
+    if mode == "off":
+        return ""
+    where = f"{title}, стр. {page}" if page else title
+    if mode == "head":
+        words = page_text.split()
+        head = " ".join(words[:18])
+        return f"{where}. {head}\n"
+    return f"{where}\n"
+
+
 def process(session: Session, embedder: Embedder, doc_id: int) -> None:
     doc = documents_repo.get(session, doc_id)
     if doc is None:
@@ -41,16 +54,20 @@ def process(session: Session, embedder: Embedder, doc_id: int) -> None:
         session.commit()
 
         pieces: list[tuple[int | None, str]] = []
+        #что именно уходит в эмбеддинг: контекст страницы плюс кусок. в базе кусок лежит без контекста
+        to_embed: list[str] = []
         for page, text in read_pages(Path(doc.path)):
+            context = context_line(settings.chunk_context, doc.title, page, text)
             for chunk in split_text(text, settings.chunk_size, settings.chunk_overlap):
                 pieces.append((page, chunk))
+                to_embed.append(context + chunk)
         if not pieces:
             raise ValueError("В файле нет текста, возможно это скан")
 
         vectors: list[list[float]] = []
         #пачками чтобы не упереться в память на больших pdf
-        for i in range(0, len(pieces), BATCH):
-            vectors.extend(embedder.embed_passages([t for _, t in pieces[i : i + BATCH]]))
+        for i in range(0, len(to_embed), BATCH):
+            vectors.extend(embedder.embed_passages(to_embed[i : i + BATCH]))
 
         chunks_repo.add_many(session, doc.id, pieces, vectors)
         doc.chunks_count = len(pieces)
