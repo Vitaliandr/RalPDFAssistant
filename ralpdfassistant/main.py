@@ -3,11 +3,13 @@ from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlparse
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
+from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from ralpdfassistant import logs
 from ralpdfassistant.core.reindex import ensure_vector_dim
@@ -114,6 +116,17 @@ async def security_headers(request: Request, call_next: CallNext) -> Response:
     return response
 
 
+# чужой сайт не шлёт post/delete за нас
+@app.middleware("http")
+async def same_origin_only(request: Request, call_next: CallNext) -> Response:
+    origin = request.headers.get("origin")
+    if origin and request.method not in ("GET", "HEAD", "OPTIONS"):
+        if urlparse(origin).netloc != request.headers.get("host", ""):
+            log.info("отказ: чужой origin %s", origin[:100])
+            return JSONResponse(status_code=403, content={"detail": "запрос с чужого сайта"})
+    return await call_next(request)
+
+
 #последний = первый на входе, id есть во всех логах
 @app.middleware("http")
 async def with_request_id(request: Request, call_next: CallNext) -> Response:
@@ -125,6 +138,11 @@ async def with_request_id(request: Request, call_next: CallNext) -> Response:
         logs.request_id.reset(token)
     response.headers["X-Request-ID"] = rid
     return response
+
+
+# от dns rebinding
+hosts = [h.strip() for h in settings.allowed_hosts.split(",") if h.strip()]
+app.add_middleware(TrustedHostMiddleware, allowed_hosts=hosts)
 
 
 @app.get("/health")

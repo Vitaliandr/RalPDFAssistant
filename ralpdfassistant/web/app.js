@@ -149,7 +149,7 @@ const clearBtn = document.getElementById('clearChat');
 let lastDocs = [];
 let timer = null;
 
-//чаты лежат в браузере: all общий, остальные по id документа
+// all общий, остальные по id документа
 let chats = {};
 let current = 'all';
 const MAX_MSGS = 60;
@@ -399,9 +399,9 @@ document.getElementById('form').onsubmit = async e => {
   const question = input.value.trim();
   if (!question) return;
 
-  //локальной ключ не нужен
+  // локальной ключ не нужен
   const key = isCloud() ? getKey(modelEl.value) : '';
-  //нет ключа, открываем панель
+  // нет ключа, открываем панель
   if (isCloud() && !key) {
     addMsg('Для этой модели нужен ключ: вставь его в панели «Ключ» вверху страницы или выбери локальную модель.', 'bot');
     keyOpen = true;
@@ -410,7 +410,7 @@ document.getElementById('form').onsubmit = async e => {
     return;
   }
 
-  //чат где спросили, пока ждём ответ можно уйти в другой
+  // чат где спросили, ответ придёт туда
   const asked = current;
   const userMsg = { role: 'user', text: question };
   pushMsg(asked, userMsg);

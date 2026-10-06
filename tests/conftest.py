@@ -22,6 +22,8 @@ def _test_database_url() -> str:
 os.environ["DATABASE_URL"] = _test_database_url()
 os.environ["UPLOADS_DIR"] = tempfile.mkdtemp(prefix="ralpdfassistant_")
 os.environ["EMBED_MODEL"] = "intfloat/multilingual-e5-large"
+#testserver это имя хоста у TestClient
+os.environ["ALLOWED_HOSTS"] = "testserver,localhost"
 
 import io
 from collections.abc import Iterator

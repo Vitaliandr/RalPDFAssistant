@@ -7,8 +7,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-# не от root: если в приложении найдут дыру, у атакующего не будет прав на весь контейнер.
-#папки data создаём заранее чтобы volume унаследовал владельца
+#не от root, папки data заранее чтоб volume взял владельца
 RUN useradd --create-home --uid 1000 app && mkdir -p data/models data/uploads && chown -R app /code/data
 USER app
 

@@ -57,6 +57,8 @@ class Settings(BaseSettings):
 
     docs: bool = True
     log_json: bool = False
+    # с каких хостов пускаем, на сервере свой домен
+    allowed_hosts: str = "localhost,127.0.0.1"
 
     def llm_profiles(self) -> dict[str, LlmProfile]:
         return {

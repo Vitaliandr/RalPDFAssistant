@@ -41,6 +41,37 @@ def test_bad_request_id_is_replaced(client):
     assert r.headers["x-request-id"] != "evil\nline"
 
 
+def test_foreign_host_is_refused(client):
+    # rebinding, чужое имя хоста
+    r = client.get("/api/documents", headers={"Host": "evil.example"})
+    assert r.status_code == 400
+
+
+def test_known_host_is_fine(client):
+    assert client.get("/health", headers={"Host": "localhost:8000"}).status_code == 200
+
+
+def test_foreign_origin_cannot_post(client, jobs):
+    r = client.post("/api/documents/text", json={"title": "x", "text": "текст"}, headers={"Origin": "http://evil.example"})
+    assert r.status_code == 403
+    assert jobs == []
+
+
+def test_foreign_origin_cannot_delete(client):
+    r = client.delete("/api/documents/1", headers={"Origin": "http://evil.example"})
+    assert r.status_code == 403
+
+
+def test_own_origin_is_fine(client):
+    r = client.post("/api/documents/text", json={"title": "x", "text": "текст"}, headers={"Origin": "http://testserver"})
+    assert r.status_code == 200
+
+
+def test_foreign_origin_can_still_read_health(client):
+    # get данные не меняет, пропускаем
+    assert client.get("/health", headers={"Origin": "http://evil.example"}).status_code == 200
+
+
 def test_new_request_id_rules():
     assert logs.new_request_id(None) != logs.new_request_id(None)
     assert logs.new_request_id("a" * 100) != "a" * 100
